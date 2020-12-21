@@ -11,7 +11,6 @@ digit [0-9]
 
 number ({digit_n}{digit}+)|{digit}
 float_number {number}"."{digit}+
-sign -
 
 bool_val "True"|"False"
 
@@ -21,12 +20,13 @@ text \"[^\"]*\"
 identificator [_a-zA-Z][_0-9a-zA-Z]*
 
 operator [+\-\*%]
+negation "!"
 
 space [' ''\t''\n']
 
 %option noyywrap
 %%
-{type} {printf("tip : %s\n",yytext);return TYPE;}
+("const"{space})?{type} {printf("tip : %s\n",yytext);return TYPE;}
 {number} {yylval = atoi(yytext);printf("numar intreg: %s\n",yytext);return INT_NUM;}
 {float_number} {yylval= 2.2;printf("numar rational : %f\n",yylval);return FLOAT_NUM;}
 {character} {printf("single character : %s\n",yytext);return CHAR;}
@@ -35,6 +35,26 @@ space [' ''\t''\n']
 {identificator} {printf("id : %s\n",yytext);return ID;}
 {identificator}\[{number}\] {printf("array : %s\n",yytext);return ID;}
 {operator} {printf("operator : %c\n",yytext[0]);return yytext[0];}
+
+"if" {return IF;}
+"else" {return ELSE;}
+"for" {return FOR;}
+"while" {return WHILE;}
+"switch" {return SWITCH;}
+
+"function" {return FUNCTION;}
+
+">" {return GT;}
+">=" {return GE;}
+"<" {return LT;}
+"<=" {return LE;}
+"==" {return EQ;}
+
+"&&" {return AND;}
+"||" {return OR;}
+
+"=" {return ASSIGN;}
+
 {space} ;
 . ;
 %%
