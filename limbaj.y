@@ -21,14 +21,11 @@ extern int yylineno;
 program : blocuri {printf("program corect\n");}
         ;
 
-blocuri : declaratii
-        | asignari
-        | instructiuni
+blocuri : declaratie ';' blocuri
+        | instructiune ';' blocuri
+        | asignare ';' blocuri
+        | /* empty */
         ;
-      
-declaratii : declaratie ';'
-           | declaratii declaratie ';'
-           ;
 
 declaratie : TYPE identificator 
            | CLASS ID '{' class_dec '}'
@@ -43,20 +40,12 @@ identificator : identificator ',' ID
               | ARRAY
               ;
 
-asignari : asignare ';'
-         | asignari asignare ';'
-         ;
-
 asignare : ID ASSIGN INT_NUM 
          | ID ASSIGN FLOAT_NUM 
          | ID ASSIGN CHAR
          | ID ASSIGN TEXT
          | ID ASSIGN ID
          ;
-
-instructiuni : instructiune ';'
-             | instructiuni instructiune ';'
-             ;
 
 instructiune : expr {$$=$1; printf("instr->expr : valoare : %d \n",$$);}
              ;
