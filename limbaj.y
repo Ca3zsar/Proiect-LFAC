@@ -10,7 +10,7 @@ extern int yylineno;
 %}
 %start program
 %token ID TYPE INT_NUM FLOAT_NUM CHAR TEXT ARRAY
-%token BOOL_VAL
+%token BOOL_VAL CLASS
 %token IF ELSE FOR WHILE SWITCH GT GE LT LE EQ AND OR ASSIGN FUNCTION
 
 
@@ -21,20 +21,21 @@ extern int yylineno;
 program : blocuri {printf("program corect\n");}
         ;
 
-blocuri : bloc bloc
+blocuri : declaratii
+        | asignari
+        | instructiuni
         ;
-
-bloc : declaratii
-     | asignare
-     | instructiuni
-     | /* empty */
-     ;
+      
 declaratii : declaratie ';'
            | declaratii declaratie ';'
            ;
 
 declaratie : TYPE identificator 
+           | CLASS ID '{' class_dec '}'
            ;
+
+class_dec : /* empty */
+          ;
 
 identificator : identificator ',' ID
               | identificator ',' ARRAY      
@@ -42,21 +43,24 @@ identificator : identificator ',' ID
               | ARRAY
               ;
 
-asignare : ID ASSIGN INT_NUM
-         | ID ASSIGN FLOAT_NUM
+asignari : asignare ';'
+         | asignari asignare ';'
+         ;
+
+asignare : ID ASSIGN INT_NUM 
+         | ID ASSIGN FLOAT_NUM 
          | ID ASSIGN CHAR
          | ID ASSIGN TEXT
+         | ID ASSIGN ID
          ;
 
 instructiuni : instructiune ';'
              | instructiuni instructiune ';'
              ;
 
-instructiune : s 
+instructiune : expr {$$=$1; printf("instr->expr : valoare : %d \n",$$);}
              ;
 
-s : expr {$$=$1; printf("s->expr : valoare : %d \n",$$);}
-  ;
 expr : expr '+' expr {$$=$1+$3; printf("expr->expr+expr\n");}
      | expr '-' expr {$$=$1-$3; printf("expr->expr-expr\n");}
      | expr '*' expr {$$=$1*$3; printf("expr->expr*expr\n");}

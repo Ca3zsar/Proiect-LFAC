@@ -46,6 +46,7 @@ space [' ''\t''\n']
 "=" {return ASSIGN;}
 
 ("const"{space})?{type} {printf("tip : %s\n",yytext);return TYPE;}
+"class" {printf("class\n");return CLASS;}
 {number} {yylval = atoi(yytext);printf("numar intreg: %s\n",yytext);return INT_NUM;}
 {float_number} {yylval= 2.2;printf("numar rational : %f\n",yylval);return FLOAT_NUM;}
 {character} {printf("single character : %s\n",yytext);return CHAR;}
