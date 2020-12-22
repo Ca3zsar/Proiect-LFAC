@@ -10,6 +10,7 @@ extern int yylineno;
 %}
 %start s
 %token ID TYPE INT_NUM FLOAT_NUM CHAR TEXT UMINUS
+%token IF ELSE FOR WHILE SWITCH GT GE LT LE EQ AND OR ASSIGN FUNCTION
 %token BOOL_VAL
 
 %left '+' '-'
