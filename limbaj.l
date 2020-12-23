@@ -1,6 +1,7 @@
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include "calcul.h"
 #include "y.tab.h"
 %}
 
@@ -22,21 +23,11 @@ identificator [_a-zA-Z][_0-9a-zA-Z]*
 operator [+\-\*%]
 negation "!"
 
-space [' ''\t''\n']
+space [' ''\t']
 
 %option noyywrap
 %%
-("const"{space})?{type} {printf("tip : %s\n",yytext);return TYPE;}
-{number} {yylval = atoi(yytext);printf("numar intreg: %s\n",yytext);return INT_NUM;}
-{float_number} {yylval= 2.2;printf("numar rational : %f\n",yylval);return FLOAT_NUM;}
-{character} {printf("single character : %s\n",yytext);return CHAR;}
-{text} {printf("text : %s\n",yytext);return TEXT;}
-{bool_val} {printf("bool value : %s\n",yytext);return BOOL_VAL;}
-{identificator} {printf("id : %s\n",yytext);return ID;}
-{identificator}\[{number}\] {printf("array : %s\n",yytext);return ID;}
-{operator} {printf("operator : %c\n",yytext[0]);return yytext[0];}
-
-"if" {return IF;}
+"if" {printf("if token\n");return IF;}
 "else" {return ELSE;}
 "for" {return FOR;}
 "while" {return WHILE;}
@@ -55,6 +46,37 @@ space [' ''\t''\n']
 
 "=" {return ASSIGN;}
 
+"const" {return CONST;}
+{type} {yylval.string = strdup(yytext);
+                         return TYPE;}
+
+"class" {yylval.string = strdup(yytext);
+        return CLASS;}
+
+{number} {yylval.num = (struct number){atoi(yytext),0,0};
+         return INT_NUM;}
+
+{float_number} {yylval.num = (struct number){0,atof(yytext),1};
+                return FLOAT_NUM;}
+
+{character} {yylval.string = strdup(yytext);
+            return CHAR;}
+
+{text} {yylval.string = strdup(yytext);
+                        return TEXT;}
+
+{bool_val} { yylval.string = strdup(yytext);
+            return BOOL_VAL;}
+
+{identificator} {yylval.string = strdup(yytext);
+                return ID;}
+
+{identificator}\[{number}\] {yylval.string = strdup(yytext);
+                            return ARRAY;}
+{operator} {return yytext[0];}
+
+
 {space} ;
-. ;
+\n {yylineno++;}
+. {return yytext[0];}
 %%
