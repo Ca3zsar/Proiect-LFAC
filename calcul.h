@@ -111,7 +111,8 @@ static struct number modulo(struct number a, struct number b)
 
 static struct number negate(struct number a)
 {
-    if(!a.is_rational)
+
+    if(a.is_rational)
     {
         a=(struct number){0,-a.rational,1};
     }else{
