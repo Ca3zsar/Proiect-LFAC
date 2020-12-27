@@ -74,7 +74,7 @@ parameter : TYPE ID
 	    | /* empty */
 	    ;
 
-class_dec : ID '(' parameter_list ')' '{' instructiune '}'
+class_dec : ID '(' parameter_list ')' '{' blocuri '}'
 	    | declaratie
           ;
 
