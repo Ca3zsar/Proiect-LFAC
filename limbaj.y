@@ -262,10 +262,11 @@ void freeNode(nodeType *p);
 %token <string>FUNCTION
 %token <string> CONST
 %token <string> NOT
+%token <string> RETURN
 
 %type <nPtr> expr
-%type <nPtr> asignare
-%type <nPtr> instructiune
+%type <nPtr> assignation
+%type <nPtr> instruction
 
 %left OR 
 %left AND
@@ -280,26 +281,44 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : blocuri {printf("program corect\n");}
-        ;
-
-blocuri : declaratie ';' blocuri 
-        | instructiune ';' blocuri
-        | asignari ';' blocuri
+program : program global
+        | program function
         | /* empty */
         ;
 
-declaratie : TYPE identificator 
-	         | TYPE ID '(' parameter_list ')' '{' blocuri '}'
-           | CONST TYPE identificator 
+global :  statements
+       ;
+
+statements : declaration ';'  
+           | instruction ';' 
+           | assignation ';' 
+           | RETURN expr ';'
+           ;
+
+function : TYPE ID '(' parameter_list ')' '{' function_instr '}'
+         ;
+
+function_instr : function_instr statements
+               | statements
+               ;
+
+declaration : TYPE identifier 
+           | CONST TYPE identifier
            | CLASS ID '{' class_dec '}'
            | ID ID 
            ;
 
-class_dec : declaratie ';' class_dec
-          | declaratie ';'
-          |  ID '(' parameter_list ')' '{' blocuri '}'
+class_dec : declaration ';' class_dec
+          | declaration ';'
+          | ID '(' parameter_list ')' '{' class_instr'}'
+          | function class_dec
+          | function 
           ;
+
+class_instr : class_instr declaration ';'
+            | class_instr instruction ';'
+            | class_instr assignation ';'
+            | /* empty */
 
 parameter_list : parameter
                 | parameter_list ',' parameter
@@ -309,54 +328,50 @@ parameter : TYPE ID
 	    | /* empty */
 	    ;
 
-identificator : identificator ',' asignare 
-              | identificator ',' ID 
-              | identificator ',' ARRAY 
-              | asignare 
+identifier : identifier ',' assignation 
+              | identifier ',' ID 
+              | identifier ',' ARRAY 
+              | assignation
               | ID  
               | ARRAY
               ;
 
-asignari : asignare 
-         ;
-
-asignare : ID ASSIGN expr {$$ = opr('=',2,id($1),$3);}
-
+assignation : ID ASSIGN expr {$$ = opr('=',2,id($1),$3);}
          | ID ASSIGN CHAR {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
          | ID ASSIGN TEXT {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
          ;
 
-instructiune : expr {$$=$1;}
-             | apel_functie
+instruction : expr {$$=$1;}
+             | function_call
              | ID '.' ID
-             | ID '.' apel_functie
+             | ID '.' function_call
              | if_check 
              | while_check
              ;
 
-apel_functie : ID '(' argumente ')'
+function_call : ID '(' arguments ')'
              ;
              
-argumente : argumente ',' expr
-          | argumente ',' apel_functie
+arguments : arguments ',' expr
+          | arguments ',' function_call
           | expr
-          | apel_functie
+          | function_call
           | /* empty */
           ;
 
-if_check : IF '(' conditii ')' '{' blocuri'}'
+if_check : IF '(' conditions ')' '{' statements '}'
          ;
 
-while_check : WHILE '(' conditii ')' '{' blocuri '}'
+while_check : WHILE '(' conditions ')' '{' statements '}'
 
-conditii : conditii AND conditii 
-         | conditii OR conditii 
-         | NOT conditii
-         | '(' conditii ')'
-         | conditie
+conditions : condition AND condition 
+         | condition OR condition 
+         | NOT conditions
+         | '(' conditions ')'
+         | condition
          ;
 
-conditie : expr EQ expr
+condition : expr EQ expr
          | expr GT expr
          | expr GE expr
          | expr LT expr
