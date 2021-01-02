@@ -1,8 +1,12 @@
 %{
 #include "calcul.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include "tree.h"
+#include "compiler.h"
 
 int yylex();
 void yyerror(const char *s);
@@ -11,109 +15,92 @@ extern FILE* yyin;
 extern char* yytext;
 extern int yylineno;
 
-typedef union{
-    int int_value;
-    float float_value;
-    int *int_array;
-    float *float_array;
-    char *content;
-  } value_t;
-
-struct variables
-{
-  char *type;
-  char *name;
-  int constant;
-  int initialised;
-  value_t value;
-  struct variables *next;
-};
-
-struct variables *var_head = NULL;
-struct variables *var_current;
-struct variables *var_last = NULL;
+struct variables *global_head = NULL;
+struct variables *global_current;
+struct variables *global_last = NULL;
 
 struct variables temp[100];
 int index_temp = 0;
 
 char *global_type;
 
-int exists_variable(char *name)
+
+int exists_variable(char *name,struct variables *current_stack)
 {
-  var_current = var_head;
-  while(var_current!=NULL)
+  struct variables *temp_stack = current_stack;
+  while(temp_stack!=NULL)
   {
-    if(strcmp(name,var_current->name)==0)
+    if(strcmp(name,temp_stack->name)==0)
     {
       return 1;
     }
-    var_current = var_current->next;
+    temp_stack = temp_stack->next;
   }
   return 0;
 }
 
-void assign_value(char* type,char *name,char *constant,value_t v,int initialised)
+/*void assign_value(char* type,char *name,char *constant,value_t v,int initialised)
 {
-  if(var_head==NULL)
+  if(global_head==NULL)
   {
-    var_head = (struct variables *) malloc(sizeof(struct variables));
+    global_head = (struct variables *) malloc(sizeof(struct variables));
 
-     var_head->type = strdup(type);
-     var_head->name = strdup(name);
-     if(strcmp(constant,"yes")==0)var_head->constant=1;
-     else var_head->constant = 0;
+     global_head->type = strdup(type);
+     global_head->name = strdup(name);
+     if(strcmp(constant,"yes")==0)global_head->constant=1;
+     else global_head->constant = 0;
 
      if(initialised){
         if(strcmp(type,"int")==0)
         {
-          var_head->value.int_value=v.int_value;
+          global_head->value.int_value=v.int_value;
         }
         if(strcmp(type,"float")==0)
         {
-          var_head->value.float_value=v.float_value;
+          global_head->value.float_value=v.float_value;
         }
         if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
         {
-          var_head->value.content=strdup(v.content);
+          global_head->value.content=strdup(v.content);
         }
      }
-     var_head->next = var_last;
+     global_head->next = global_last;
   }
   else{
     if(!exists_variable(name))
     {
-      var_last = (struct variables *) malloc(sizeof(struct variables));
+      global_last = (struct variables *) malloc(sizeof(struct variables));
 
-      var_last->type = strdup(type); 
-      var_last->name = strdup(name);
+      global_last->type = strdup(type); 
+      global_last->name = strdup(name);
 
-      if(strcmp(constant,"yes")==0)var_last->constant=1;
-      else var_last->constant = 0;
+      if(strcmp(constant,"yes")==0)global_last->constant=1;
+      else global_last->constant = 0;
 
       if(initialised){
         if(strcmp(type,"int")==0)
         {
-          var_last->value.int_value=v.int_value;
+          global_last->value.int_value=v.int_value;
         }
         if(strcmp(type,"float")==0)
         {
-          var_last->value.float_value=v.float_value;
+          global_last->value.float_value=v.float_value;
         }
         if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
         {
-          var_last->value.content=strdup(v.content);
+          global_last->value.content=strdup(v.content);
         }
       }
-      //var_last = var_last->next;
-      struct variables *var_current_temp;
-      var_current_temp = var_head;
+      //global_last = global_last->next;
+      struct variables *global_current_temp;
+      global_current_temp = global_head;
 
-      while(var_current_temp->next != NULL){
-        var_current_temp = var_current_temp->next;
+      while(global_current_temp->next != NULL){
+        global_current_temp = global_current_temp->next;
       }
       
-      var_current_temp -> next = var_last;
-      var_current_temp -> next -> next = NULL;
+      global_current_temp -> next = global_last;
+      global_current_temp -> next -> next = NULL;
       return;
     }
     yyerror("already defined variable");
@@ -164,39 +151,39 @@ void modify_linked()
   for(int i=0;i<index_temp;i++)
   {
     int found = 0;
-    var_current = var_head;
-    while(var_current!=NULL)
+    global_current = global_head;
+    while(global_current!=NULL)
     {
-      if(strcmp(temp[i].name,var_current->name)==0)
+      if(strcmp(temp[i].name,global_current->name)==0)
       {
-        if(strcmp(var_current->type,temp[i].type))
+        if(strcmp(global_current->type,temp[i].type))
         {
           yyerror("incompatible types!");
         }
 
-        if(var_current->constant==1)
+        if(global_current->constant==1)
         {
           yyerror("cannot modify const");
         }
 
-        if(strcmp(var_current->type,"int")==0)
+        if(strcmp(global_current->type,"int")==0)
         {
-          var_current->value.int_value = temp[i].value.int_value;
+          global_current->value.int_value = temp[i].value.int_value;
         }
-        if(strcmp(var_current->type,"float")==0){
-          var_current->value.float_value = temp[i].value.float_value;
+        if(strcmp(global_current->type,"float")==0){
+          global_current->value.float_value = temp[i].value.float_value;
         }
-        if(strcmp(var_current->type,"char")==0 || strcmp(var_current->type,"string")==0)
+        if(strcmp(global_current->type,"char")==0 || strcmp(global_current->type,"string")==0)
         {
-          var_current->value.content = strdup(temp[i].value.content);
+          global_current->value.content = strdup(temp[i].value.content);
         }
 
-        var_current->initialised = 1;
+        global_current->initialised = 1;
         
         found = 1;
         break;
       }
-      var_current = var_current->next;
+      global_current = global_current->next;
     }
     if(!found)
     {
@@ -206,11 +193,12 @@ void modify_linked()
   index_temp = 0;
 }
 
+
 struct number get_value(char *name){
   struct number num = {0,0,0,0};
   int a=0;
   
-  var_current = var_head;
+  global_current = global_head;
   while(var_current!=NULL)
   {
     a++;
@@ -231,13 +219,22 @@ struct number get_value(char *name){
   yyerror("variabile not declared");
 
 }
+*/
 
+nodeType *opr(int operation,int number, ...);
+nodeType *id(char *name);
+nodeType *constant(value_t value,char *type);
+nodeType *func(char *name,char *type,...);
+nodeType *dec(char *type,char *name,int constant,int array,struct variables *current_stack);
+
+void freeNode(nodeType *p);
 %}
 
 %union {
   struct number num;
   int bool_val;
   char *string;
+  struct nodeTypeTag *nPtr;
 };
 
 %start program
@@ -254,7 +251,6 @@ struct number get_value(char *name){
 %token <string>ELSE
 %token <string>FOR
 %token <string>WHILE
-%token <string>SWITCH
 %token <string>GT
 %token <string>GE
 %token <string>LT
@@ -267,8 +263,9 @@ struct number get_value(char *name){
 %token <string> CONST
 %token <string> NOT
 
-%type <num> expr
-%type instructiune
+%type <nPtr> expr
+%type <nPtr> asignare
+%type <nPtr> instructiune
 
 %left OR 
 %left AND
@@ -277,19 +274,24 @@ struct number get_value(char *name){
 %left '+' '-'
 %left '*' '/' '%'
 %left '(' ')'
+%left UMINUS
+
+%nonassoc IFX
+%nonassoc ELSE
+
 %%
 program : blocuri {printf("program corect\n");}
         ;
 
-blocuri : declaratie ';' blocuri
+blocuri : declaratie ';' blocuri 
         | instructiune ';' blocuri
         | asignari ';' blocuri
         | /* empty */
         ;
 
-declaratie : TYPE identificator {add_to_linked("no",$1);}
+declaratie : TYPE identificator 
 	         | TYPE ID '(' parameter_list ')' '{' blocuri '}'
-           | CONST TYPE identificator {add_to_linked("yes",$2);}
+           | CONST TYPE identificator 
            | CLASS ID '{' class_dec '}'
            | ID ID 
            ;
@@ -308,29 +310,28 @@ parameter : TYPE ID
 	    ;
 
 identificator : identificator ',' asignare 
-              | identificator ',' ID {value_t v;add_to_temp(" ",$3,v,0);}
+              | identificator ',' ID 
               | identificator ',' ARRAY 
               | asignare 
-              | ID  {value_t v;add_to_temp(" ",$1,v,0);}
+              | ID  
               | ARRAY
               ;
 
-asignari : asignare {modify_linked();} 
+asignari : asignare 
          ;
 
-asignare : ID ASSIGN expr {if($3.is_rational){value_t v;v.float_value=$3.rational;add_to_temp("float",$1,v,1);}
-                                            else{value_t v;v.int_value=$3.integer;add_to_temp("int",$1,v,1);}}
+asignare : ID ASSIGN expr {$$ = opr('=',2,id($1),$3);}
 
-         | ID ASSIGN CHAR {value_t v;v.content = strdup($3);add_to_temp("char",$1,v,1);}
-         | ID ASSIGN TEXT {value_t v;v.content = strdup($3);add_to_temp("string",$1,v,1);}
+         | ID ASSIGN CHAR {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
+         | ID ASSIGN TEXT {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
          ;
 
-instructiune : expr {($1.is_rational)?printf("instr->expr : valoare : %f \n\n",$1.rational):
-                                             printf("instr->expr : valoare : %d \n\n",$1.integer);}
+instructiune : expr {$$=$1;}
              | apel_functie
              | ID '.' ID
              | ID '.' apel_functie
              | if_check 
+             | while_check
              ;
 
 apel_functie : ID '(' argumente ')'
@@ -363,17 +364,16 @@ conditie : expr EQ expr
          | expr
          ;
 
-expr : expr '+' expr {$$=addition($1,$3); printf("expr->expr+expr\n");}
-     | expr '-' expr {$$=substraction($1,$3); printf("expr->expr-expr\n");}
-     | expr '*' expr {$$=multiply($1,$3); printf("expr->expr*expr\n");}
-     | expr '/' expr {$$=division($1,$3); printf("expr->expr/expr\n");}
-     | expr '%' expr {$$=modulo($1,$3);if($$.modulo_error)yyerror("Modulo se poate doar pe intregi"); 
-                        printf("expr->expr%%expr\n");}
+expr : expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
+     | expr '-' expr {$$=opr('-',2,$1,$3); printf("expr->expr-expr\n");}
+     | expr '*' expr {$$=opr('*',2,$1,$3); printf("expr->expr*expr\n");}
+     | expr '/' expr {$$=opr('/',2,$1,$3); printf("expr->expr/expr\n");}
+     | expr '%' expr {$$=opr('%',2,$1,$3); printf("expr->expr%%expr\n");}
      | '(' expr ')' {$$ = $2; printf("expr->(expr)\n");}
-     | '-' expr {$$=negate($2);printf("expr-> -expr\n");}
-     | INT_NUM {$$=$1; printf("expr->%d\n",$1);}
-     | FLOAT_NUM {$$=$1;printf("expr->%f\n",$1.rational);}
-     | ID {$$=get_value($1);printf("expr->%s\n",$1);}
+     | '-' expr {$$=opr(UMINUS,1,$2);printf("expr-> -expr\n");}
+     | INT_NUM {value_t v;v.int_value=$1.integer;$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
+     | FLOAT_NUM {value_t v;v.int_value=$1.rational;$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
+     | ID {$$=id($1);printf("expr->%s\n",$1);}
      ;
 %%
 void yyerror(const char * s){
@@ -381,24 +381,128 @@ void yyerror(const char * s){
   exit(0);
 }
 
-void print_table()
+nodeType *constant(value_t value,char* type)
 {
-  char* filename = "symbol_table.txt";
-  FILE *symbol = fopen(filename,"w");
-  fprintf(symbol,"---The declared variables are: ---\n");
-  var_current = var_head;
+  nodeType *p;
 
-  while(var_current != NULL)
+  // allocate node
+  if ((p = malloc(sizeof(constNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  // copy info
+  p->type = constType;
+  p->con.value_type = strdup(type);
+  if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
   {
-    var_current=var_current->next;
+    p->con.value.string_value = strdup(value.content);
+  }
+  if(strcmp(type,"int")==0)
+  {
+    p->con.value.i_value = value.int_value;
+  }
+  if(strcmp(type,"float")==0)
+  {
+    p->con.value.f_value = value.float_value;
+  }
+  if(strcmp(type,"bool")==0)
+  {
+    p->con.value.b_value = value.int_value;
   }
 
+  return p;
+}
+
+nodeType *id(char *name)
+{
+  nodeType *p;
+
+  // allocate node
+  if ((p = malloc(sizeof(idNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = idType;
+  p->id.name = strdup(name);
+
+  return p;
+}
+
+nodeType *dec(char *type,char *name,int constant,int array,struct variables *current_stack)
+{
+  nodeType *p;
+
+  // allocate node
+  if ((p = malloc(sizeof(declarNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = declarType;
+  p->dec.name = strdup(name);
+  p->dec.pred_type = strdup(type);
+  p->dec.constant = constant;
+  p->dec.arr_size = array;
+
+  current_stack = (struct variables *) malloc(sizeof(struct variables));
+
+  current_stack->type = strdup(type); 
+  current_stack->name = strdup(name);
+
+  if(constant)current_stack->constant=1;
+  else current_stack->constant = 0;
+
+  struct variables *global_current_temp;
+  global_current_temp = global_head;
+
+  while(global_current_temp->next != NULL){
+    global_current_temp = global_current_temp->next;
+  }
+  
+  global_current_temp -> next = current_stack;
+  global_current_temp -> next -> next = NULL;
+  
+  return p;
+}
+
+nodeType *opr(int operation,int number, ...)
+{
+  va_list ap;
+  nodeType *p;
+  size_t size;
+  int i;
+
+  size = sizeof(operationNode) + (number - 1) * sizeof(nodeType*);
+  if ((p = malloc(sizeof(constNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  // copy info
+  p->type = operType;
+  p->opr.operation = operation;
+  p->opr.operNumber = number;
+  va_start(ap,number);
+
+  for(i=0;i<number;i++)
+  {
+    p->opr.operands[i] = va_arg(ap,nodeType*);
+  }
+  va_end(ap);
+  return p;
+}
+
+void freeNode(nodeType *p)
+{
+  int i;
+  if(!p)return;
+  if(p->type == operType)
+  {
+    for(i=0;i<p->opr.operNumber;i++)
+    {
+      freeNode(p->opr.operands[i]);
+    }
+  }
+  free(p);
 }
 
 int main(void)
 {
     yyin = fopen("program.txt","r");
     yyparse();
-    print_table();
     return 0;
 }

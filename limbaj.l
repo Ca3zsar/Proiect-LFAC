@@ -31,7 +31,6 @@ space [' ''\t']
 "else" {return ELSE;}
 "for" {return FOR;}
 "while" {return WHILE;}
-"switch" {return SWITCH;}
 
 "function" {return FUNCTION;}
 
