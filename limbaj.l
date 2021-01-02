@@ -31,22 +31,23 @@ space [' ''\t']
 "else" {return ELSE;}
 "for" {return FOR;}
 "while" {return WHILE;}
+"print" {return PRINT;}
 
-"function" {return FUNCTION;}
+"=" {return ASSIGN;}
 
 ">" {return GT;}
 ">=" {return GE;}
 "<" {return LT;}
 "<=" {return LE;}
 "==" {return EQ;}
+"!=" {return NE;}
 "!" {return NOT;}
 
 "&&" {return AND;}
 "||" {return OR;}
 
-"=" {return ASSIGN;}
-
 "const" {return CONST;}
+"return" {return RETURN;}
 {type} {yylval.string = strdup(yytext);
                          return TYPE;}
 
@@ -71,8 +72,6 @@ space [' ''\t']
 {identificator} {yylval.string = strdup(yytext);
                 return ID;}
 
-{identificator}\[{number}\] {yylval.string = strdup(yytext);
-                            return ARRAY;}
 {operator} {return yytext[0];}
 
 

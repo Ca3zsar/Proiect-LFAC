@@ -234,7 +234,7 @@ void freeNode(nodeType *p);
   struct number num;
   int bool_val;
   char *string;
-  struct nodeTypeTag *nPtr;
+  struct nodeTypeTag *nodePointer;
 };
 
 %start program
@@ -255,6 +255,7 @@ void freeNode(nodeType *p);
 %token <string>GE
 %token <string>LT
 %token <string>LE
+%token <string>NE
 %token <string>EQ
 %token <string>AND
 %token <string>OR
@@ -263,15 +264,19 @@ void freeNode(nodeType *p);
 %token <string> CONST
 %token <string> NOT
 %token <string> RETURN
+%token PRINT
 
-%type <nPtr> expr
-%type <nPtr> assignation
-%type <nPtr> instruction
+%type <nodePointer> expr
+%type <nodePointer> assignation
+%type <nodePointer> instruction
+%type <nodePointer> conditions
+%type <nodePointer> while_check
+%type <nodePointer> if_check
 
 %left OR 
 %left AND
 %left NOT
-%left GT GE LT LE EQ 
+%left GT GE LT LE EQ NE
 %left '+' '-'
 %left '*' '/' '%'
 %left '(' ')'
@@ -337,9 +342,9 @@ identifier : identifier ',' assignation
               ;
 
 assignation : ID ASSIGN expr {$$ = opr('=',2,id($1),$3);}
-         | ID ASSIGN CHAR {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
-         | ID ASSIGN TEXT {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
-         ;
+            | ID ASSIGN CHAR {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
+            | ID ASSIGN TEXT {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
+            ;
 
 instruction : expr {$$=$1;}
              | function_call
@@ -360,30 +365,32 @@ arguments : arguments ',' expr
           ;
 
 if_check : IF '(' conditions ')' '{' statements '}'
+                                    {$$ = opr(IF,2,$3,$6);}
          ;
 
-while_check : WHILE '(' conditions ')' '{' statements '}'
+while_check : WHILE '(' conditions ')' '{' statements '}' 
+                                    {$$ = opr(WHILE,2,$3,$6);}
+            ;
 
-conditions : condition AND condition 
-         | condition OR condition 
-         | NOT conditions
-         | '(' conditions ')'
-         | condition
-         ;
-
-condition : expr EQ expr
-         | expr GT expr
-         | expr GE expr
-         | expr LT expr
-         | expr LE expr
-         | expr
-         ;
+conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr&&expr\n");}
+           | conditions OR conditions  {$$ = opr(OR,2,$1,$3);printf("expr->expr||expr\n");}
+           | '(' conditions AND conditions ')' {$$ = opr(AND,2,$2,$4);printf("expr->expr&&expr\n");}
+           | '(' conditions OR conditions ')'{$$ = opr(OR,2,$2,$4);printf("expr->expr||expr\n");}
+           | NOT conditions {$$ = opr(NOT,1,$2);printf("expr->!expr\n");}
+           | expr {$$ = $1;}
+           ;
 
 expr : expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
      | expr '-' expr {$$=opr('-',2,$1,$3); printf("expr->expr-expr\n");}
      | expr '*' expr {$$=opr('*',2,$1,$3); printf("expr->expr*expr\n");}
      | expr '/' expr {$$=opr('/',2,$1,$3); printf("expr->expr/expr\n");}
      | expr '%' expr {$$=opr('%',2,$1,$3); printf("expr->expr%%expr\n");}
+     | expr EQ expr {$$=opr(EQ,2,$1,$3); printf("expr->expr==expr\n");}
+     | expr NE expr {$$=opr(NE,2,$1,$3); printf("expr->expr!=expr\n");}
+     | expr GT expr {$$=opr(GT,2,$1,$3); printf("expr->expr>expr\n");}
+     | expr GE expr {$$=opr(GE,2,$1,$3); printf("expr->expr>=expr\n");}
+     | expr LT expr {$$=opr(LT,2,$1,$3); printf("expr->expr<expr\n");}
+     | expr LE expr {$$=opr(LE,2,$1,$3); printf("expr->expr<=expr\n");}
      | '(' expr ')' {$$ = $2; printf("expr->(expr)\n");}
      | '-' expr {$$=opr(UMINUS,1,$2);printf("expr-> -expr\n");}
      | INT_NUM {value_t v;v.int_value=$1.integer;$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
