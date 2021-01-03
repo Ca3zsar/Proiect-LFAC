@@ -4,222 +4,288 @@
 #include "tree.h"
 #include "y.tab.h"
 
-extern FILE* yyin;
-extern char* yytext;
+extern FILE *yyin;
+extern char *yytext;
 extern int yylineno;
 
 extern void yyerror(const char *s);
 
 // global stack
 stackType *global_head = NULL;
-stackType *global_current;
 stackType *global_last = NULL;
 
 stackType *var_stack = NULL;
 
-stackType* exists_variable(char *name,stackType *current_stack)
+stackType *exists_variable(char *name, int is_global)
 {
-  stackType *temp_stack = current_stack;
-  while(temp_stack!=NULL)
-  {
-    printf("%s -- %s\n",name,temp_stack->var.name);
-    if(strcmp(name,temp_stack->var.name)==0)
+
+    stackType *temp_stack = (stackType *)malloc(sizeof(stackType));
+    if (is_global)
     {
-      return temp_stack;
+        temp_stack = global_head;
     }
-    temp_stack = temp_stack->next;
-  }
-  return 0;
+    else
+    {
+        temp_stack = var_stack;
+    }
+
+    while (temp_stack != NULL)
+    {
+        if (strcmp(name, temp_stack->var.name) == 0)
+        {
+            return temp_stack;
+        }
+        temp_stack = temp_stack->next;
+    }
+    return 0;
 }
 
-void declare_variable(declarNode node,stackType *current_stack)
+void declare_variable(declarNode node, int is_global)
 {
-    int i=0;
-    if(current_stack == NULL)
+    int i = 0;
+
+    stackType *current_stack = (stackType *)malloc(sizeof(stackType));
+    if (is_global)
     {
-        current_stack = (stackType*)malloc(sizeof(stackType));
+        current_stack = global_head;
+    }
+    else
+    {
+        current_stack = var_stack;
+    }
+    
+    
+    if (current_stack == NULL)
+    {
+        current_stack = (stackType *)malloc(sizeof(stackType));
         current_stack->next = NULL;
         current_stack->var.value.value_type = strdup(node.pred_type);
         current_stack->var.name = strdup(node.names[0]);
-        if(node.constant)current_stack->var.constant=1;
-        else current_stack->var.constant = 0;
+        if (node.constant)
+            current_stack->var.constant = 1;
+        else
+            current_stack->var.constant = 0;
         i++;
     }
-    for(;i<node.nr_declared;i++)
+    for (; i < node.nr_declared; i++)
     {
-        if(exists_variable(node.names[i],current_stack))
+        if (exists_variable(node.names[i], is_global))
             yyerror("variable already defined in current scope!");
 
-        stackType *current_temp = (stackType*)malloc(sizeof(stackType)); 
-        current_temp = current_stack;
-        while(current_temp->next != NULL){
-            current_temp = current_temp->next;
+        stackType *last_stack = (stackType *)malloc(sizeof(stackType));
+
+        last_stack->var.value.value_type = strdup(node.pred_type);
+        last_stack->var.name = strdup(node.names[i]);
+
+        if (node.constant)
+            last_stack->var.constant = 1;
+        else
+            last_stack->var.constant = 0;
+
+        last_stack->next = NULL;
+
+        stackType *temp;
+        temp = current_stack;
+        while (temp->next != NULL)
+        {
+            temp = temp->next;
         }
 
-        current_temp = (stackType *) malloc(sizeof(stackType));
-
-        current_temp->var.value.value_type = strdup(node.pred_type); 
-        current_temp->var.name = strdup(node.names[i]);
-
-        if(node.constant)current_temp->var.constant=1;
-        else current_temp->var.constant = 0;
-    
-        current_temp -> next = NULL;
-
+        temp->next = last_stack;
+        temp->next->next = NULL;
     }
-    
 }
 
-void assign_variable(idNode node, valueType val,stackType *current_stack)
+void assign_variable(idNode node, valueType val, int is_global)
 {
     char *var_name = strdup(node.name);
-    stackType *found = (stackType*)malloc(sizeof(stackType));
+    stackType *found = (stackType *)malloc(sizeof(stackType));
 
-    if(!(found=exists_variable(var_name,current_stack)))
+    stackType *current_stack = (stackType *)malloc(sizeof(stackType));
+    if (is_global)
+    {
+        current_stack = global_head;
+    }
+    else
+    {
+        current_stack = var_stack;
+    }
+
+    if (!(found = exists_variable(var_name, is_global)))
         yyerror("variable not declared!");
-    
-    if(strcmp(val.value_type,found->var.value.value_type))
+
+    if (strcmp(val.value_type, found->var.value.value_type))
         yyerror("wrong type used!");
-    
-    if(strcmp(val.value_type,"int")==0)
+
+    if (strcmp(val.value_type, "int") == 0)
     {
         found->var.value.i_value = val.i_value;
     }
-    if(strcmp(val.value_type,"float")==0)
+    if (strcmp(val.value_type, "float") == 0)
     {
         found->var.value.f_value = val.f_value;
     }
-    if(strcmp(val.value_type,"bool")==0)
+    if (strcmp(val.value_type, "bool") == 0)
     {
         found->var.value.b_value = val.b_value;
     }
-    if(strcmp(val.value_type,"char")==0 || strcmp(val.value_type,"string")==0)
+    if (strcmp(val.value_type, "char") == 0 || strcmp(val.value_type, "string") == 0)
     {
         found->var.value.string_value = strdup(val.string_value);
     }
-
 }
 
-valueType get_value(char *name,stackType *current_stack){
-  int a=0;
-  
-  stackType *found = (stackType*)malloc(sizeof(stackType));
-
-  if(!(found=exists_variable(name,current_stack)))
-    yyerror("variable not declared");
-
-  valueType tempVal;
-
-  stackType *tempStack = current_stack;
-  if(strcmp(tempStack->var.value.value_type,"float")==0)
-  {
-    tempVal.f_value=tempStack->var.value.f_value;
-  }
-  if(strcmp(tempStack->var.value.value_type,"int")==0)
-  {
-    tempVal.i_value=tempStack->var.value.i_value;
-  }
-  if(strcmp(tempStack->var.value.value_type,"bool")==0)
-  {
-    tempVal.b_value=tempStack->var.value.b_value;
-  }
-  if(strcmp(tempStack->var.value.value_type,"string")==0 || strcmp(tempStack->var.value.value_type,"char")==0)
-  {
-    tempVal.string_value=tempStack->var.value.string_value;
-  }
-
-  return tempVal;
-}
-
-void add_to_stack(stackType *next_el,stackType *current_stack)
+valueType get_value(char *name, int is_global)
 {
-    stackType *current_temp = current_stack;
-    while(current_temp->next != NULL){
+    int a = 0;
+
+    stackType *found = (stackType *)malloc(sizeof(stackType));
+
+    stackType *current_stack = (stackType *)malloc(sizeof(stackType));
+    if (is_global)
+    {
+        current_stack = global_head;
+    }
+    else
+    {
+        current_stack = var_stack;
+    }
+
+    if (!(found = exists_variable(name, is_global)))
+        yyerror("variable not declared");
+
+    valueType tempVal;
+
+    stackType *tempStack = current_stack;
+    if (strcmp(tempStack->var.value.value_type, "float") == 0)
+    {
+        tempVal.f_value = tempStack->var.value.f_value;
+    }
+    if (strcmp(tempStack->var.value.value_type, "int") == 0)
+    {
+        tempVal.i_value = tempStack->var.value.i_value;
+    }
+    if (strcmp(tempStack->var.value.value_type, "bool") == 0)
+    {
+        tempVal.b_value = tempStack->var.value.b_value;
+    }
+    if (strcmp(tempStack->var.value.value_type, "string") == 0 || strcmp(tempStack->var.value.value_type, "char") == 0)
+    {
+        tempVal.string_value = tempStack->var.value.string_value;
+    }
+
+    return tempVal;
+}
+
+void add_to_stack(stackType *next_el, int is_global)
+{
+    stackType *current_temp = (stackType*)malloc(sizeof(stackType));
+    if(is_global)
+    {
+        current_temp = global_head;
+    }else{
+        current_temp = var_stack;
+    }
+
+    while (current_temp->next != NULL)
+    {
         current_temp = current_temp->next;
     }
 
-    current_temp = (stackType *) malloc(sizeof(stackType));
+    current_temp = (stackType *)malloc(sizeof(stackType));
     current_temp->tip = next_el->tip;
-    if(next_el->tip==0)
+    if (next_el->tip == 0)
     {
         current_temp->scope = strdup(next_el->scope);
-    }else{
+    }
+    else
+    {
         current_temp->var = next_el->var;
     }
 }
 
 void print_value(valueType val)
 {
-    if(strcmp(val.value_type,"int")==0)
+    if (strcmp(val.value_type, "int") == 0)
     {
-        printf("%d\n",val.i_value);
+        printf("%d\n", val.i_value);
     }
-    if(strcmp(val.value_type,"float")==0)
+    if (strcmp(val.value_type, "float") == 0)
     {
-        printf("%f\n",val.f_value);
+        printf("%f\n", val.f_value);
     }
-    if(strcmp(val.value_type,"string")==0 || strcmp(val.value_type,"char")==0 )
+    if (strcmp(val.value_type, "string") == 0 || strcmp(val.value_type, "char") == 0)
     {
-        printf("%s\n",val.string_value);
+        printf("%s\n", val.string_value);
     }
-    if(strcmp(val.value_type,"bool")==0)
+    if (strcmp(val.value_type, "bool") == 0)
     {
-        if(val.b_value==0)printf("False\n");
-        else printf("True");
+        if (val.b_value == 0)
+            printf("False\n");
+        else
+            printf("True");
     }
 }
 
-
-valueType interpret(nodeType *root,stackType *stack){
+valueType interpret(nodeType *root, int is_global)
+{
     valueType v;
     stackType *last;
 
     v.initialised = 0;
 
-    if(!root) {
+    if (!root)
+    {
         return v;
     }
-    switch(root->type)
+    switch (root->type)
     {
-        case constType : return root->con.value;
-        case idType : return get_value(root->id.name,stack);
-        case declarType :   declare_variable(root->dec,stack);
-                            printf("%s--\n",stack->var.name);
-                            return v;
-        case operType:
-            switch(root->opr.operation){
-                case WHILE : last = (stackType*)malloc(sizeof(stackType));
-                             last->scope=strdup("while");
-                             last->tip=0;
-                             add_to_stack(last,stack);
-                             while (interpret(root->opr.operands[0],stack).is_true)
-                             {
-                                interpret(root->opr.operands[1],stack);
-                             }
-                             return v;
-                case IF: last = (stackType*)malloc(sizeof(stackType));
-                         last->scope=strdup("if");
-                         last->tip=0;
-                         add_to_stack(last,stack);
-                         if(interpret(root->opr.operands[0],stack).is_true)
-                         {
-                            interpret(root->opr.operands[1],stack);
-                         }else if(root->opr.operNumber > 2)
-                         {
-                            interpret(root->opr.operands[2],stack);
-                         }
-                         return v;
-                case PRINT: print_value(interpret(root->opr.operands[0],stack));
-                case ASSIGN : assign_variable(root->opr.operands[0]->id,
-                                        interpret(root->opr.operands[1],stack),stack);
-                             
+    case constType:
+        return root->con.value;
+    case idType:
+        return get_value(root->id.name, is_global);
+    case declarType:
+        declare_variable(root->dec, is_global);
+        printf("%s -- \n",global_head->var.name);
+        return v;
+    case operType:
+        switch (root->opr.operation)
+        {
+        case WHILE:
+            last = (stackType *)malloc(sizeof(stackType));
+            last->scope = strdup("while");
+            last->tip = 0;
+            add_to_stack(last, is_global);
+            while (interpret(root->opr.operands[0], is_global).is_true)
+            {
+                interpret(root->opr.operands[1], is_global);
             }
+            return v;
+        case IF:
+            last = (stackType *)malloc(sizeof(stackType));
+            last->scope = strdup("if");
+            last->tip = 0;
+            add_to_stack(last, is_global);
+            if (interpret(root->opr.operands[0], is_global).is_true)
+            {
+                interpret(root->opr.operands[1], is_global);
+            }
+            else if (root->opr.operNumber > 2)
+            {
+                interpret(root->opr.operands[2], is_global);
+            }
+            return v;
+        case PRINT:
+            print_value(interpret(root->opr.operands[0], is_global));
+        case ASSIGN:
+            assign_variable(root->opr.operands[0]->id,
+                            interpret(root->opr.operands[1], is_global), is_global);
+        }
     }
 }
 
-
-void yyerror(const char * s){
-  printf("eroare: %s la linia:%d\n",s,yylineno);
-  exit(0);
+void yyerror(const char *s)
+{
+    printf("eroare: %s la linia:%d\n", s, yylineno);
+    exit(0);
 }
-

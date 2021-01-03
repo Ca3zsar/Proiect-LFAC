@@ -15,7 +15,6 @@ typedef struct{
 
 struct variables
 {
-  char *type;
   char *name;
   int constant;
   int initialised;
@@ -66,9 +65,10 @@ typedef struct{
 typedef struct{
     nodeTypes type;
     char *pred_type;
-    char *name;
+    char *names[100];
     int constant;
     int arr_size;
+    int nr_declared;
 } declarNode;
 
 typedef struct nodeTypeTag {

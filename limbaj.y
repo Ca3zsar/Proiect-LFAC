@@ -62,7 +62,6 @@ int yylex();
           global_last->value.content=strdup(v.content);
         }
       }
-      //global_last = global_last->next;
       struct variables *global_current_temp;
       global_current_temp = global_head;
 
@@ -236,8 +235,8 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {interpret($2,global_head);}
-        | program function {compile($2,var_stack);interpret($2,var_stack);free($2);}
+program : program global {interpret($2,1);}
+        | program function {compile($2,var_stack);interpret($2,0);free($2);}
         | /* empty */
         ;
 
