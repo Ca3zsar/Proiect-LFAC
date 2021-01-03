@@ -1,43 +1,14 @@
 %{
 #include "calcul.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include "tree.h"
 #include "compiler.h"
+#include "interpretor.h"
 
 int yylex();
-void yyerror(const char *s);
-
-extern FILE* yyin;
-extern char* yytext;
-extern int yylineno;
-
-struct variables *global_head = NULL;
-struct variables *global_current;
-struct variables *global_last = NULL;
-
-struct variables temp[100];
-int index_temp = 0;
-
-char *global_type;
-
-
-int exists_variable(char *name,struct variables *current_stack)
-{
-  struct variables *temp_stack = current_stack;
-  while(temp_stack!=NULL)
-  {
-    if(strcmp(name,temp_stack->name)==0)
-    {
-      return 1;
-    }
-    temp_stack = temp_stack->next;
-  }
-  return 0;
-}
 
 /*void assign_value(char* type,char *name,char *constant,value_t v,int initialised)
 {
@@ -192,40 +163,13 @@ void modify_linked()
   }
   index_temp = 0;
 }
-
-
-struct number get_value(char *name){
-  struct number num = {0,0,0,0};
-  int a=0;
-  
-  global_current = global_head;
-  while(var_current!=NULL)
-  {
-    a++;
-    if(strcmp(var_current->name,name)==0)
-    {
-      if(strcmp(var_current->type,"float")==0)
-      {
-        num.is_rational=1;
-        num.rational=var_current->value.float_value;
-      }else{
-        num.is_rational=0;
-        num.integer =var_current->value.int_value;
-      }
-      return num;
-    }
-    var_current = var_current->next;
-  }
-  yyerror("variabile not declared");
-
-}
 */
 
 nodeType *opr(int operation,int number, ...);
 nodeType *id(char *name);
-nodeType *constant(value_t value,char *type);
+nodeType *constant(valueType value,char *type);
 nodeType *func(char *name,char *type,...);
-nodeType *dec(char *type,char *name,int constant,int array,struct variables *current_stack);
+nodeType *dec(char *type,char *name,int constant,int array,stackType *current_stack);
 
 void freeNode(nodeType *p);
 %}
@@ -272,6 +216,7 @@ void freeNode(nodeType *p);
 %type <nodePointer> conditions
 %type <nodePointer> while_check
 %type <nodePointer> if_check
+%type <nodePointer> statements
 
 %left OR 
 %left AND
@@ -297,6 +242,7 @@ global :  statements
 statements : declaration ';'  
            | instruction ';' 
            | assignation ';' 
+           | PRINT expr ';'
            | RETURN expr ';'
            ;
 
@@ -323,6 +269,7 @@ class_dec : declaration ';' class_dec
 class_instr : class_instr declaration ';'
             | class_instr instruction ';'
             | class_instr assignation ';'
+            | class_instr PRINT ';'
             | /* empty */
 
 parameter_list : parameter
@@ -334,16 +281,16 @@ parameter : TYPE ID
 	    ;
 
 identifier : identifier ',' assignation 
-              | identifier ',' ID 
-              | identifier ',' ARRAY 
-              | assignation
-              | ID  
-              | ARRAY
-              ;
+            | identifier ',' ID 
+            | identifier ',' ARRAY 
+            | assignation
+            | ID  
+            | ARRAY
+            ;
 
 assignation : ID ASSIGN expr {$$ = opr('=',2,id($1),$3);}
-            | ID ASSIGN CHAR {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
-            | ID ASSIGN TEXT {value_t v;v.content = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
+            | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
+            | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
             ;
 
 instruction : expr {$$=$1;}
@@ -366,6 +313,8 @@ arguments : arguments ',' expr
 
 if_check : IF '(' conditions ')' '{' statements '}'
                                     {$$ = opr(IF,2,$3,$6);}
+         | IF '(' conditions ')' '{' statements '}' ELSE '{' statements '}'
+                                    {$$ = opr(IF,3,$3,$6,$10);}
          ;
 
 while_check : WHILE '(' conditions ')' '{' statements '}' 
@@ -393,17 +342,14 @@ expr : expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
      | expr LE expr {$$=opr(LE,2,$1,$3); printf("expr->expr<=expr\n");}
      | '(' expr ')' {$$ = $2; printf("expr->(expr)\n");}
      | '-' expr {$$=opr(UMINUS,1,$2);printf("expr-> -expr\n");}
-     | INT_NUM {value_t v;v.int_value=$1.integer;$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
-     | FLOAT_NUM {value_t v;v.int_value=$1.rational;$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
+     | INT_NUM {valueType v;v.i_value=$1.integer;$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
+     | FLOAT_NUM {valueType v;v.f_value=$1.rational;$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
      | ID {$$=id($1);printf("expr->%s\n",$1);}
      ;
 %%
-void yyerror(const char * s){
-  printf("eroare: %s la linia:%d\n",s,yylineno);
-  exit(0);
-}
 
-nodeType *constant(value_t value,char* type)
+
+nodeType *constant(valueType value,char* type)
 {
   nodeType *p;
 
@@ -416,19 +362,19 @@ nodeType *constant(value_t value,char* type)
   p->con.value_type = strdup(type);
   if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
   {
-    p->con.value.string_value = strdup(value.content);
+    p->con.value.string_value = strdup(value.string_value);
   }
   if(strcmp(type,"int")==0)
   {
-    p->con.value.i_value = value.int_value;
+    p->con.value.i_value = value.i_value;
   }
   if(strcmp(type,"float")==0)
   {
-    p->con.value.f_value = value.float_value;
+    p->con.value.f_value = value.f_value;
   }
   if(strcmp(type,"bool")==0)
   {
-    p->con.value.b_value = value.int_value;
+    p->con.value.b_value = value.i_value;
   }
 
   return p;
@@ -448,7 +394,7 @@ nodeType *id(char *name)
   return p;
 }
 
-nodeType *dec(char *type,char *name,int constant,int array,struct variables *current_stack)
+nodeType *dec(char *type,char *name,int constant,int array,stackType *current_stack)
 {
   nodeType *p;
 
@@ -462,23 +408,20 @@ nodeType *dec(char *type,char *name,int constant,int array,struct variables *cur
   p->dec.constant = constant;
   p->dec.arr_size = array;
 
-  current_stack = (struct variables *) malloc(sizeof(struct variables));
-
-  current_stack->type = strdup(type); 
-  current_stack->name = strdup(name);
-
-  if(constant)current_stack->constant=1;
-  else current_stack->constant = 0;
-
-  struct variables *global_current_temp;
-  global_current_temp = global_head;
-
-  while(global_current_temp->next != NULL){
-    global_current_temp = global_current_temp->next;
+  stackType *current_temp = current_stack;
+  while(current_temp->next != NULL){
+    current_temp = current_temp->next;
   }
+
+  current_temp = (stackType *) malloc(sizeof(stackType));
+
+  current_temp->var.type = strdup(type); 
+  current_temp->var.name = strdup(name);
+
+  if(constant)current_temp->var.constant=1;
+  else current_temp->var.constant = 0;
   
-  global_current_temp -> next = current_stack;
-  global_current_temp -> next -> next = NULL;
+  current_temp -> next = NULL;
   
   return p;
 }

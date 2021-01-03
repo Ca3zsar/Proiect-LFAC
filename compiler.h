@@ -25,7 +25,22 @@ int compile(nodeType *root,struct variables stack)
             {
                 case WHILE:
                     fprintf(symbol,"L%03d:\n",lbl1=lbl++);
-                    compile(root->opr.operands[0],stack);        
+                    compile(root->opr.operands[0],stack);
+                    fprintf(symbol,"\tjz\tL%03d\n",lbl2=lbl++);
+                    compile(root->opr.operands[1],stack);
+                    fprintf(symbol,"\tjmp\tL%03d\n",lbl1);
+                    fprintf(symbol,"\tL%03d:\n",lbl2);
+                    break;
+                case IF:
+                    compile(root->opr.operands[0],stack);
+                    if(root->opr.operNumber > 2){
+                        //if-else
+                        fprintf(symbol,"\tjz\tL%03d\n",lbl1=lbl++);
+                        compile(root->opr.operands[1],stack);
+                        fprintf(symbol,"\tjmp\tL%03d\n",lbl2=lbl++);
+                        fprintf(symbol,"L%03d:\n",lbl1);
+                        compile(root->opr.operands[2],stack);
+                    }  
             }
 
     }

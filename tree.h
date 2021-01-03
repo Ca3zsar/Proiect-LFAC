@@ -2,12 +2,14 @@
 #define TREE_H
 
 typedef union{
-    int int_value;
-    float float_value;
-    int *int_array;
-    float *float_array;
-    char *content;
-  } value_t;
+    int i_value;
+    int *i_array;
+    float f_value;
+    float *f_array;
+    int b_value;
+    char *string_value;
+    int initialised;
+}valueType;
 
 struct variables
 {
@@ -15,19 +17,19 @@ struct variables
   char *name;
   int constant;
   int initialised;
-  value_t value;
-  struct variables *next;
+  valueType value;
 };
+
+typedef struct stk{
+    int tip;
+    char *scope;
+    struct variables var;
+    struct stk *next;
+} stackType;
 
 typedef enum { constType, idType, operType, funcType,declarType} nodeTypes;
 typedef enum { integer, floating, string, character, boolean} predefined; 
 
-typedef union{
-    int i_value;
-    float f_value;
-    int b_value;
-    char *string_value;
-}valueType;
 
 /* constant values */
 typedef struct{
