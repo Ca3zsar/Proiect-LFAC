@@ -169,7 +169,10 @@ nodeType *opr(int operation,int number, ...);
 nodeType *id(char *name);
 nodeType *constant(valueType value,char *type);
 nodeType *func(char *name,char *type,...);
-nodeType *dec(char *type,char *name,int constant,int array,stackType *current_stack);
+nodeType *dec(char *type,char **names,int constant,int array);
+
+char *temp_ids[100];
+int temp_index;
 
 void freeNode(nodeType *p);
 %}
@@ -216,8 +219,8 @@ void freeNode(nodeType *p);
 %type <nodePointer> conditions
 %type <nodePointer> while_check
 %type <nodePointer> if_check
-%type <nodePointer> statements
-%type <nodePointer> global
+%type <nodePointer> statements interior_statements statements_list
+%type <nodePointer> global function
 %type <nodePointer> declaration
 
 %left OR 
@@ -233,20 +236,27 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {compile($2,global_head);interpret($2,global_head);free($2);}
-        | program function
+program : program global {interpret($2,global_head);}
+        | program function {compile($2,var_stack);interpret($2,var_stack);free($2);}
         | /* empty */
         ;
 
-global :  statements 
+global :  statements
        ;
 
-statements : declaration ';'  
-           | instruction ';' 
-           | assignation ';' 
-           | PRINT expr ';' {}
+statements :declaration ';'  {$$ = $1;}
+           | instruction ';'  {$$ = $1;}
+           | assignation ';' {$$ = $1;}
+           | if_check 
+           | while_check
+           | PRINT expr ';' {$$ = opr(PRINT,1,$2);}
            | RETURN expr ';'
            ;
+
+
+interior_statements : interior_statements statements
+                    | statements
+                    ;
 
 function : TYPE ID '(' parameter_list ')' '{' function_instr '}'
          ;
@@ -255,8 +265,8 @@ function_instr : function_instr statements
                | statements
                ;
 
-declaration : TYPE identifier 
-           | CONST TYPE identifier
+declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
+           | CONST TYPE identifier {$$=dec($1,temp_ids,1,0);}
            | CLASS ID '{' class_dec '}'
            | ID ID 
            ;
@@ -277,30 +287,28 @@ class_instr : class_instr declaration ';'
 parameter_list : parameter
                 | parameter_list ',' parameter
                 ;
-		   
-parameter : TYPE ID
+
+parameter : TYPE ID 
 	    | /* empty */
 	    ;
 
-identifier : identifier ',' assignation 
-            | identifier ',' ID 
+identifier : /* identifier ',' assignation */ 
+             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_index++;}
             | identifier ',' ARRAY 
-            | assignation
-            | ID  
+            | /* assignation */
+            | ID  {temp_ids[temp_index] = strdup($1);temp_index++;}
             | ARRAY
             ;
 
-assignation : ID ASSIGN expr {$$ = opr('=',2,id($1),$3);}
-            | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);$$ = opr('=',2,id($1),constant(v,"char"));}
-            | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);$$ = opr('=',2,id($1),constant(v,"string"));}
+assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
+            | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
+            | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
             ;
 
 instruction : expr {$$=$1;}
              | function_call
              | ID '.' ID
              | ID '.' function_call
-             | if_check 
-             | while_check
              ;
 
 function_call : ID '(' arguments ')'
@@ -313,13 +321,13 @@ arguments : arguments ',' expr
           | /* empty */
           ;
 
-if_check : IF '(' conditions ')' '{' statements '}'
+if_check : IF '(' conditions ')' '{' interior_statements '}'
                                     {$$ = opr(IF,2,$3,$6);}
-         | IF '(' conditions ')' '{' statements '}' ELSE '{' statements '}'
+         | IF '(' conditions ')' '{' interior_statements '}' ELSE '{' interior_statements '}'
                                     {$$ = opr(IF,3,$3,$6,$10);}
          ;
 
-while_check : WHILE '(' conditions ')' '{' statements '}' 
+while_check : WHILE '(' conditions ')' '{' interior_statements '}' 
                                     {$$ = opr(WHILE,2,$3,$6);}
             ;
 
@@ -344,8 +352,8 @@ expr : expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
      | expr LE expr {$$=opr(LE,2,$1,$3); printf("expr->expr<=expr\n");}
      | '(' expr ')' {$$ = $2; printf("expr->(expr)\n");}
      | '-' expr {$$=opr(UMINUS,1,$2);printf("expr-> -expr\n");}
-     | INT_NUM {valueType v;v.i_value=$1.integer;$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
-     | FLOAT_NUM {valueType v;v.f_value=$1.rational;$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
+     | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
+     | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
      | ID {$$=id($1);printf("expr->%s\n",$1);}
      ;
 %%
@@ -396,7 +404,7 @@ nodeType *id(char *name)
   return p;
 }
 
-nodeType *dec(char *type,char *name,int constant,int array,stackType *current_stack)
+nodeType *dec(char *type,char **name,int constant,int array)
 {
   nodeType *p;
 
@@ -405,10 +413,16 @@ nodeType *dec(char *type,char *name,int constant,int array,stackType *current_st
     yyerror("cannot allocate node");
 
   p->type = declarType;
-  p->dec.name = strdup(name);
+  for(int i=0;i<temp_index;i++)
+  {
+    p->dec.names[i] = strdup(temp_ids[i]);
+  }
   p->dec.pred_type = strdup(type);
   p->dec.constant = constant;
   p->dec.arr_size = array;
+  p->dec.nr_declared = temp_index;
+
+  temp_index=0;
 
   return p;
 }
