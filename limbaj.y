@@ -217,6 +217,8 @@ void freeNode(nodeType *p);
 %type <nodePointer> while_check
 %type <nodePointer> if_check
 %type <nodePointer> statements
+%type <nodePointer> global
+%type <nodePointer> declaration
 
 %left OR 
 %left AND
@@ -231,18 +233,18 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global
+program : program global {compile($2,global_head);interpret($2,global_head);free($2);}
         | program function
         | /* empty */
         ;
 
-global :  statements
+global :  statements 
        ;
 
 statements : declaration ';'  
            | instruction ';' 
            | assignation ';' 
-           | PRINT expr ';'
+           | PRINT expr ';' {}
            | RETURN expr ';'
            ;
 
@@ -359,7 +361,7 @@ nodeType *constant(valueType value,char* type)
 
   // copy info
   p->type = constType;
-  p->con.value_type = strdup(type);
+  p->con.value.value_type= strdup(type);
   if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
   {
     p->con.value.string_value = strdup(value.string_value);
@@ -408,21 +410,6 @@ nodeType *dec(char *type,char *name,int constant,int array,stackType *current_st
   p->dec.constant = constant;
   p->dec.arr_size = array;
 
-  stackType *current_temp = current_stack;
-  while(current_temp->next != NULL){
-    current_temp = current_temp->next;
-  }
-
-  current_temp = (stackType *) malloc(sizeof(stackType));
-
-  current_temp->var.type = strdup(type); 
-  current_temp->var.name = strdup(name);
-
-  if(constant)current_temp->var.constant=1;
-  else current_temp->var.constant = 0;
-  
-  current_temp -> next = NULL;
-  
   return p;
 }
 

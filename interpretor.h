@@ -30,9 +30,9 @@ int exists_variable(char *name,stackType *current_stack)
   return 0;
 }
 
-void declare_variable(declarNode *node,stackType *current_stack)
+void declare_variable(declarNode node,stackType *current_stack)
 {
-    if(exists_variable(node->name,current_stack))
+    if(exists_variable(node.name,current_stack))
         yyerror("variable already defined in current scope!");
     
     stackType *current_temp = current_stack;
@@ -42,10 +42,10 @@ void declare_variable(declarNode *node,stackType *current_stack)
 
     current_temp = (stackType *) malloc(sizeof(stackType));
 
-    current_temp->var.type = strdup(node->pred_type); 
-    current_temp->var.name = strdup(node->name);
+    current_temp->var.type = strdup(node.pred_type); 
+    current_temp->var.name = strdup(node.name);
 
-    if(node->constant)current_temp->var.constant=1;
+    if(node.constant)current_temp->var.constant=1;
     else current_temp->var.constant = 0;
   
     current_temp -> next = NULL;
@@ -89,17 +89,84 @@ valueType get_value(char *name,stackType *current_stack){
 
 }
 
+void add_to_stack(stackType *next_el,stackType *current_stack)
+{
+    stackType *current_temp = current_stack;
+    while(current_temp->next != NULL){
+        current_temp = current_temp->next;
+    }
+
+    current_temp = (stackType *) malloc(sizeof(stackType));
+    current_temp->tip = next_el->tip;
+    if(next_el->tip==0)
+    {
+        current_temp->scope = strdup(next_el->scope);
+    }else{
+        current_temp->var = next_el->var;
+    }
+}
+
+void print_value(valueType val)
+{
+    if(strcmp(val.value_type,"int")==0)
+    {
+        printf("%d\n",val.i_value);
+    }
+    if(strcmp(val.value_type,"float")==0)
+    {
+        printf("%f\n",val.f_value);
+    }
+    if(strcmp(val.value_type,"string")==0 || strcmp(val.value_type,"char")==0 )
+    {
+        printf("%s\n",val.string_value);
+    }
+    if(strcmp(val.value_type,"bool")==0)
+    {
+        if(val.b_value==0)printf("False\n");
+        else printf("True");
+    }
+}
 
 valueType interpret(nodeType *root,stackType *stack){
+    valueType v;
+    stackType *last;
+
+    v.initialised = 0;
+
     if(!root) {
-        valueType v;
-        v.initialised = 0;
         return v;
     }
     switch(root->type)
     {
         case constType : return root->con.value;
         case idType : return get_value(root->id.name,stack);
+        case declarType : declare_variable(root->dec,stack);
+        case operType:
+            switch(root->opr.operation){
+                case WHILE : last = (stackType*)malloc(sizeof(stackType));
+                             last->scope=strdup("while");
+                             last->tip=0;
+                             add_to_stack(last,stack);
+                             while (interpret(root->opr.operands[0],stack).is_true)
+                             {
+                                interpret(root->opr.operands[1],stack);
+                             }
+                             return v;
+                case IF: last = (stackType*)malloc(sizeof(stackType));
+                         last->scope=strdup("if");
+                         last->tip=0;
+                         add_to_stack(last,stack);
+                         if(interpret(root->opr.operands[0],stack).is_true)
+                         {
+                            interpret(root->opr.operands[1],stack);
+                         }else if(root->opr.operNumber > 2)
+                         {
+                            interpret(root->opr.operands[2],stack);
+                         }
+                         return v;
+                case PRINT: print_value(interpret(root->opr.operands[0],stack));
+                             
+            }
     }
 }
 

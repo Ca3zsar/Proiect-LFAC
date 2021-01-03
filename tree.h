@@ -1,13 +1,15 @@
 #ifndef TREE_H
 #define TREE_H
 
-typedef union{
+typedef struct{
     int i_value;
     int *i_array;
     float f_value;
     float *f_array;
     int b_value;
     char *string_value;
+    int is_true;
+    char *value_type;
     int initialised;
 }valueType;
 
@@ -35,7 +37,6 @@ typedef enum { integer, floating, string, character, boolean} predefined;
 typedef struct{
     nodeTypes type;
     valueType value;
-    char *value_type;
 } constNode;
 
 /* identifiers */

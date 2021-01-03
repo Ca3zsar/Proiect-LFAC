@@ -6,7 +6,7 @@ FILE *symbol;
 
 static int lbl;
 
-int compile(nodeType *root,struct variables stack)
+int compile(nodeType *root,stackType *stack)
 {
     int lbl1,lbl2;
     symbol = fopen("symbol_table.txt","w");
