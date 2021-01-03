@@ -44,6 +44,37 @@ void declare_variable(declarNode node, int is_global)
 {
     int i = 0;
 
+    if (is_global)
+    {
+        if (global_head == NULL)
+        {
+            global_head = (stackType *)malloc(sizeof(stackType));
+            global_head->next = NULL;
+            global_head->var.value.value_type = strdup(node.pred_type);
+            global_head->var.name = strdup(node.names[0]);
+            if (node.constant)
+                global_head->var.constant = 1;
+            else
+                global_head->var.constant = 0;
+            i++;
+        }
+    }
+    else
+    {
+        if (var_stack == NULL)
+        {
+            var_stack = (stackType *)malloc(sizeof(stackType));
+            var_stack->next = NULL;
+            var_stack->var.value.value_type = strdup(node.pred_type);
+            var_stack->var.name = strdup(node.names[0]);
+            if (node.constant)
+                var_stack->var.constant = 1;
+            else
+                var_stack->var.constant = 0;
+            i++;
+        }
+    }
+
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
     if (is_global)
     {
@@ -53,20 +84,7 @@ void declare_variable(declarNode node, int is_global)
     {
         current_stack = var_stack;
     }
-    
-    
-    if (current_stack == NULL)
-    {
-        current_stack = (stackType *)malloc(sizeof(stackType));
-        current_stack->next = NULL;
-        current_stack->var.value.value_type = strdup(node.pred_type);
-        current_stack->var.name = strdup(node.names[0]);
-        if (node.constant)
-            current_stack->var.constant = 1;
-        else
-            current_stack->var.constant = 0;
-        i++;
-    }
+
     for (; i < node.nr_declared; i++)
     {
         if (exists_variable(node.names[i], is_global))
@@ -179,11 +197,13 @@ valueType get_value(char *name, int is_global)
 
 void add_to_stack(stackType *next_el, int is_global)
 {
-    stackType *current_temp = (stackType*)malloc(sizeof(stackType));
-    if(is_global)
+    stackType *current_temp = (stackType *)malloc(sizeof(stackType));
+    if (is_global)
     {
         current_temp = global_head;
-    }else{
+    }
+    else
+    {
         current_temp = var_stack;
     }
 
@@ -246,7 +266,6 @@ valueType interpret(nodeType *root, int is_global)
         return get_value(root->id.name, is_global);
     case declarType:
         declare_variable(root->dec, is_global);
-        printf("%s -- \n",global_head->var.name);
         return v;
     case operType:
         switch (root->opr.operation)
