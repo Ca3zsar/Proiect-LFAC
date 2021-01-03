@@ -34,22 +34,6 @@ void add_to_temp(char *type,char* name,value_t value,int initialised)
   index_temp ++;
 }
 
-void add_to_linked(char* is_const,char *type)
-{
-  for(int i=0;i<index_temp;i++)
-  {
-    if(!temp[i].type[0] == ' ' && strcmp(temp[i].type,type))
-    {
-      yyerror("Incompatible types!");
-    }
-
-    assign_value(type,temp[i].name,is_const,temp[i].value,temp[i].initialised);
-    temp[i].initialised=0;
-
-  }
-  index_temp = 0;
-}
-
 void modify_linked()
 {
   for(int i=0;i<index_temp;i++)
@@ -112,7 +96,6 @@ void freeNode(nodeType *p);
 
 %union {
   struct number num;
-  int bool_val;
   char *string;
   struct nodeTypeTag *nodePointer;
 };
@@ -126,7 +109,7 @@ void freeNode(nodeType *p);
 %token <string>CLASS
 %token <num>INT_NUM
 %token <num> FLOAT_NUM
-%token <bool_val>BOOL_VAL
+%token <string>BOOL_VAL
 %token <string>IF
 %token <string>ELSE
 %token <string>FOR
@@ -152,7 +135,7 @@ void freeNode(nodeType *p);
 %type <nodePointer> conditions
 %type <nodePointer> while_check
 %type <nodePointer> if_check
-%type <nodePointer> statements interior_statements statements_list
+%type <nodePointer> statements interior_statements
 %type <nodePointer> global function
 %type <nodePointer> declaration
 
@@ -163,18 +146,18 @@ void freeNode(nodeType *p);
 %left '+' '-'
 %left '*' '/' '%'
 %left '(' ')'
-%left UMINUS
 
 %nonassoc IFX
 %nonassoc ELSE
 
 %%
-program : program global {interpret($2,1);free($2);}
+program : program global {nodeType* temp = (nodeType*)malloc(sizeof(nodeType));temp = $2;
+                          interpret($2,1);free(temp);}
         | program function {compile($2,var_stack);interpret($2,0);free($2);}
         | /* empty */
         ;
 
-global :  statements
+global :  statements {$$ = $1;}
        ;
 
 statements :declaration ';'  {$$ = $1;}
@@ -238,8 +221,8 @@ assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
             ;
 
-instruction : expr {$$=$1;}
-             | function_call
+instruction :  function_call
+             | expr {$$ = $1;}
              | ID '.' ID
              | ID '.' function_call
              ;
@@ -272,22 +255,30 @@ conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr
            | expr {$$ = $1;}
            ;
 
-expr : ID {$$=id($1);printf("expr->%s\n",$1);}
-     | expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
-     | expr '-' expr {$$=opr('-',2,$1,$3); printf("expr->expr-expr\n");}
-     | expr '*' expr {$$=opr('*',2,$1,$3); printf("expr->expr*expr\n");}
-     | expr '/' expr {$$=opr('/',2,$1,$3); printf("expr->expr/expr\n");}
-     | expr '%' expr {$$=opr('%',2,$1,$3); printf("expr->expr%%expr\n");}
-     | expr EQ expr {$$=opr(EQ,2,$1,$3); printf("expr->expr==expr\n");}
-     | expr NE expr {$$=opr(NE,2,$1,$3); printf("expr->expr!=expr\n");}
-     | expr GT expr {$$=opr(GT,2,$1,$3); printf("expr->expr>expr\n");}
-     | expr GE expr {$$=opr(GE,2,$1,$3); printf("expr->expr>=expr\n");}
-     | expr LT expr {$$=opr(LT,2,$1,$3); printf("expr->expr<expr\n");}
-     | expr LE expr {$$=opr(LE,2,$1,$3); printf("expr->expr<=expr\n");}
-     | '(' expr ')' {$$ = $2; printf("expr->(expr)\n");}
-     | '-' expr {$$=opr(UMINUS,1,$2);printf("expr-> -expr\n");}
-     | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
-     | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
+expr : ID {$$=id($1);}
+     | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int");}
+     | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");}
+     | BOOL_VAL {valueType v;
+                if(strcmp($1,"True")==0)
+                  v.b_value = 1;
+                else v.b_value=0;
+                v.value_type=strdup("bool");
+                $$=constant(v,"bool");
+                }
+     
+     | expr '+' expr {$$=opr('+',2,$1,$3);}
+     | expr '-' expr {$$=opr('-',2,$1,$3);}
+     | expr '*' expr {$$=opr('*',2,$1,$3);}
+     | expr '/' expr {$$=opr('/',2,$1,$3);}
+     | expr '%' expr {$$=opr('%',2,$1,$3);}
+     | expr EQ expr {$$=opr(EQ,2,$1,$3);}
+     | expr NE expr {$$=opr(NE,2,$1,$3);}
+     | expr GT expr {$$=opr(GT,2,$1,$3);}
+     | expr GE expr {$$=opr(GE,2,$1,$3);}
+     | expr LT expr {$$=opr(LT,2,$1,$3);}
+     | expr LE expr {$$=opr(LE,2,$1,$3);}
+     | '(' expr ')' {$$ = $2;}
+     | '-' expr{$$=opr('-',1,$2);}
      ;
 %%
 
@@ -378,6 +369,7 @@ nodeType *opr(int operation,int number, ...)
 
   for(i=0;i<number;i++)
   {
+    p->opr.operands[i] = malloc(sizeof(nodeType));
     p->opr.operands[i] = va_arg(ap,nodeType*);
   }
   va_end(ap);

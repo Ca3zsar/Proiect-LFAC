@@ -133,8 +133,6 @@ void assign_variable(idNode node, valueType val, int is_global)
     if (!(found = exists_variable(var_name, is_global)))
         yyerror("variable not declared!");
 
-
-
     if (strcmp(val.value_type, found->var.value.value_type))
         yyerror("wrong type used!");
 
@@ -252,15 +250,15 @@ void print_value(valueType val)
 
 void printStack()
 {
-    if(global_head!=NULL)
+    if (global_head != NULL)
     {
-        stackType *temp = (stackType*)malloc(sizeof(stackType));
-        temp=global_head;
-        while(temp!=NULL)
+        stackType *temp = (stackType *)malloc(sizeof(stackType));
+        temp = global_head;
+        while (temp != NULL)
         {
-            printf("%s :: \n",temp->var.name);
+            printf("%s :: \n", temp->var.name);
             print_value(temp->var.value);
-            temp=temp->next;
+            temp = temp->next;
         }
         printf("-----\n");
     }
@@ -268,7 +266,7 @@ void printStack()
 
 valueType interpret(nodeType *root, int is_global)
 {
-    valueType v;
+    valueType v, v2;
     stackType *last;
 
     // printStack();
@@ -321,26 +319,68 @@ valueType interpret(nodeType *root, int is_global)
             assign_variable(root->opr.operands[0]->id,
                             interpret(root->opr.operands[1], is_global), is_global);
         case ';':
-            interpret(root->opr.operands[0],is_global);
-            return interpret(root->opr.operands[1],is_global);
-        case UMINUS: v = interpret(root->opr.operands[0],is_global);
-                     if(strcmp(v.value_type,"int") && strcmp(v.value_type,"float"))
-                        yyerror("unary minus doesn't work with other types than int or float");
-                     else{
-                         if(strcmp(v.value_type,"int")==0)
-                        {
-                            v.i_value = -v.i_value;
-                        }else{
-                            v.f_value = -v.f_value;
-                        }
-                        return v;
-                     }   
+            interpret(root->opr.operands[0], is_global);
+            return interpret(root->opr.operands[1], is_global);
+        case '+':
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
+
+            if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0)
+                yyerror("incompatibles types for addition");
+
+            if (strcmp(v.value_type, "int") == 0)
+                v.i_value += v2.i_value;
+            if (strcmp(v.value_type, "float") == 0)
+                v.f_value += v2.f_value;
+            if (strcmp(v.value_type, "bool") == 0)
+                v.b_value = v.b_value || v2.b_value;
+            if (strcmp(v.value_type, "string") == 0)
+                strcat(v.string_value, v2.string_value);
+
+            return v;
+        case '-':
+            if (root->opr.operNumber == 2)
+            {
+                v = interpret(root->opr.operands[0], is_global);
+                v2 = interpret(root->opr.operands[1], is_global);
+
+                if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
+                    yyerror("incompatibles types for addition");
+
+                if (strcmp(v.value_type, "int") == 0)
+                    v.i_value -= v2.i_value;
+                if (strcmp(v.value_type, "float") == 0)
+                    v.f_value -= v2.f_value;
+                if (strcmp(v.value_type, "bool") == 0)
+                    v.b_value = v.b_value ^ v2.b_value;
+
+                return v;
+            }
+            else
+            {
+                v = interpret(root->opr.operands[0], is_global);
+
+                if (strcmp(v.value_type, "int") && strcmp(v.value_type, "float"))
+                    yyerror("unary minus doesn't work with other types than int or float");
+                else
+                {
+                    if (strcmp(v.value_type, "int") == 0)
+                    {
+                        v.i_value = -v.i_value;
+                    }
+                    else
+                    {
+                        v.f_value = -v.f_value;
+                    }
+                    return v;
+                }
+            }
         }
     }
 }
 
-void yyerror(const char *s)
-{
-    printf("eroare: %s la linia:%d\n", s, yylineno);
-    exit(0);
-}
+    void yyerror(const char *s)
+    {
+        printf("eroare: %s la linia:%d\n", s, yylineno);
+        exit(0);
+    }

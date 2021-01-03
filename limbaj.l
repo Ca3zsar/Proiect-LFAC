@@ -13,7 +13,7 @@ digit [0-9]
 number ({digit_n}{digit}+)|{digit}
 float_number {number}"."{digit}+
 
-bool_val "True"|"False"
+bool_val True|False
 
 character \'.\'
 text \"[^"\n]*["\n]
