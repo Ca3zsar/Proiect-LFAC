@@ -116,6 +116,7 @@ void declare_variable(declarNode node, int is_global)
 
 void assign_variable(idNode node, valueType val, int is_global)
 {
+
     char *var_name = strdup(node.name);
     stackType *found = (stackType *)malloc(sizeof(stackType));
 
@@ -131,6 +132,8 @@ void assign_variable(idNode node, valueType val, int is_global)
 
     if (!(found = exists_variable(var_name, is_global)))
         yyerror("variable not declared!");
+
+
 
     if (strcmp(val.value_type, found->var.value.value_type))
         yyerror("wrong type used!");
@@ -156,7 +159,6 @@ void assign_variable(idNode node, valueType val, int is_global)
 valueType get_value(char *name, int is_global)
 {
     int a = 0;
-
     stackType *found = (stackType *)malloc(sizeof(stackType));
 
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
@@ -191,6 +193,7 @@ valueType get_value(char *name, int is_global)
     {
         tempVal.string_value = tempStack->var.value.string_value;
     }
+    tempVal.value_type = strdup(tempStack->var.value.value_type);
 
     return tempVal;
 }
@@ -247,10 +250,28 @@ void print_value(valueType val)
     }
 }
 
+void printStack()
+{
+    if(global_head!=NULL)
+    {
+        stackType *temp = (stackType*)malloc(sizeof(stackType));
+        temp=global_head;
+        while(temp!=NULL)
+        {
+            printf("%s :: \n",temp->var.name);
+            print_value(temp->var.value);
+            temp=temp->next;
+        }
+        printf("-----\n");
+    }
+}
+
 valueType interpret(nodeType *root, int is_global)
 {
     valueType v;
     stackType *last;
+
+    // printStack();
 
     v.initialised = 0;
 
@@ -299,6 +320,21 @@ valueType interpret(nodeType *root, int is_global)
         case ASSIGN:
             assign_variable(root->opr.operands[0]->id,
                             interpret(root->opr.operands[1], is_global), is_global);
+        case ';':
+            interpret(root->opr.operands[0],is_global);
+            return interpret(root->opr.operands[1],is_global);
+        case UMINUS: v = interpret(root->opr.operands[0],is_global);
+                     if(strcmp(v.value_type,"int") && strcmp(v.value_type,"float"))
+                        yyerror("unary minus doesn't work with other types than int or float");
+                     else{
+                         if(strcmp(v.value_type,"int")==0)
+                        {
+                            v.i_value = -v.i_value;
+                        }else{
+                            v.f_value = -v.f_value;
+                        }
+                        return v;
+                     }   
         }
     }
 }

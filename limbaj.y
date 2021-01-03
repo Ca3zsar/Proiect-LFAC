@@ -10,73 +10,7 @@
 
 int yylex();
 
-/*void assign_value(char* type,char *name,char *constant,value_t v,int initialised)
-{
-  if(global_head==NULL)
-  {
-    global_head = (struct variables *) malloc(sizeof(struct variables));
-
-     global_head->type = strdup(type);
-     global_head->name = strdup(name);
-     if(strcmp(constant,"yes")==0)global_head->constant=1;
-     else global_head->constant = 0;
-
-     if(initialised){
-        if(strcmp(type,"int")==0)
-        {
-          global_head->value.int_value=v.int_value;
-        }
-        if(strcmp(type,"float")==0)
-        {
-          global_head->value.float_value=v.float_value;
-        }
-        if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
-        {
-          global_head->value.content=strdup(v.content);
-        }
-     }
-     global_head->next = global_last;
-  }
-  else{
-    if(!exists_variable(name))
-    {
-      global_last = (struct variables *) malloc(sizeof(struct variables));
-
-      global_last->type = strdup(type); 
-      global_last->name = strdup(name);
-
-      if(strcmp(constant,"yes")==0)global_last->constant=1;
-      else global_last->constant = 0;
-
-      if(initialised){
-        if(strcmp(type,"int")==0)
-        {
-          global_last->value.int_value=v.int_value;
-        }
-        if(strcmp(type,"float")==0)
-        {
-          global_last->value.float_value=v.float_value;
-        }
-        if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
-        {
-          global_last->value.content=strdup(v.content);
-        }
-      }
-      struct variables *global_current_temp;
-      global_current_temp = global_head;
-
-      while(global_current_temp->next != NULL){
-        global_current_temp = global_current_temp->next;
-      }
-      
-      global_current_temp -> next = global_last;
-      global_current_temp -> next -> next = NULL;
-      return;
-    }
-    yyerror("already defined variable");
-   }
-}
-
+/*
 void add_to_temp(char *type,char* name,value_t value,int initialised)
 {
   temp[index_temp].type = strdup(type);
@@ -235,7 +169,7 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {interpret($2,1);}
+program : program global {interpret($2,1);free($2);}
         | program function {compile($2,var_stack);interpret($2,0);free($2);}
         | /* empty */
         ;
@@ -270,6 +204,14 @@ declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
            | ID ID 
            ;
 
+identifier : /* identifier ',' assignation */ 
+             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_index++;}
+            | identifier ',' ARRAY 
+            | /* assignation */
+            | ID  {temp_ids[temp_index] = strdup($1);temp_index++;}
+            | ARRAY
+            ;
+
 class_dec : declaration ';' class_dec
           | declaration ';'
           | ID '(' parameter_list ')' '{' class_instr'}'
@@ -290,14 +232,6 @@ parameter_list : parameter
 parameter : TYPE ID 
 	    | /* empty */
 	    ;
-
-identifier : /* identifier ',' assignation */ 
-             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_index++;}
-            | identifier ',' ARRAY 
-            | /* assignation */
-            | ID  {temp_ids[temp_index] = strdup($1);temp_index++;}
-            | ARRAY
-            ;
 
 assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
@@ -338,7 +272,8 @@ conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr
            | expr {$$ = $1;}
            ;
 
-expr : expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
+expr : ID {$$=id($1);printf("expr->%s\n",$1);}
+     | expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
      | expr '-' expr {$$=opr('-',2,$1,$3); printf("expr->expr-expr\n");}
      | expr '*' expr {$$=opr('*',2,$1,$3); printf("expr->expr*expr\n");}
      | expr '/' expr {$$=opr('/',2,$1,$3); printf("expr->expr/expr\n");}
@@ -353,7 +288,6 @@ expr : expr '+' expr {$$=opr('+',2,$1,$3); printf("expr->expr+expr\n");}
      | '-' expr {$$=opr(UMINUS,1,$2);printf("expr-> -expr\n");}
      | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int"); printf("expr->%d\n",$1.integer);}
      | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");printf("expr->%f\n",$1.rational);}
-     | ID {$$=id($1);printf("expr->%s\n",$1);}
      ;
 %%
 
@@ -392,7 +326,6 @@ nodeType *constant(valueType value,char* type)
 nodeType *id(char *name)
 {
   nodeType *p;
-
   // allocate node
   if ((p = malloc(sizeof(idNode))) == NULL)
     yyerror("cannot allocate node");
@@ -408,7 +341,7 @@ nodeType *dec(char *type,char **name,int constant,int array)
   nodeType *p;
 
   // allocate node
-  if ((p = malloc(sizeof(declarNode))) == NULL)
+  if ((p = (nodeType*)malloc(sizeof(declarNode))) == NULL)
     yyerror("cannot allocate node");
 
   p->type = declarType;
@@ -433,7 +366,7 @@ nodeType *opr(int operation,int number, ...)
   size_t size;
   int i;
 
-  size = sizeof(operationNode) + (number - 1) * sizeof(nodeType*);
+  size = sizeof(operationNode) + (number ) * sizeof(nodeType*);
   if ((p = malloc(sizeof(constNode))) == NULL)
     yyerror("cannot allocate node");
 
@@ -469,5 +402,6 @@ int main(void)
 {
     yyin = fopen("program.txt","r");
     yyparse();
+    // printStack();
     return 0;
 }

@@ -16,7 +16,7 @@ float_number {number}"."{digit}+
 bool_val "True"|"False"
 
 character \'.\'
-text \"[^\"]*\"
+text \"[^"\n]*["\n]
 
 identificator [_a-zA-Z][_0-9a-zA-Z]*
 
@@ -60,11 +60,22 @@ space [' ''\t']
 {float_number} {yylval.num = (struct number){0,atof(yytext),1};
                 return FLOAT_NUM;}
 
-{character} {yylval.string = strdup(yytext);
+{character} {yylval.string = strdup(yytext+1);
+            if(yylval.string[yyleng-2] != '\''){
+                printf("improperly terminated string");
+                exit(0);
+            }else
+                yylval.string[yyleng-2] = 0;
             return CHAR;}
 
-{text} {yylval.string = strdup(yytext);
-                        return TEXT;}
+
+{text} {yylval.string = strdup(yytext+1);
+        if(yylval.string[yyleng-2] != '"'){
+            printf("improperly terminated string");
+            exit(0);
+        }else
+            yylval.string[yyleng-2] = 0;
+        return TEXT;}
 
 {bool_val} { yylval.string = strdup(yytext);
             return BOOL_VAL;}
