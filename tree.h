@@ -13,6 +13,11 @@ typedef struct{
     char *value_type;
 }valueType;
 
+typedef struct{
+    char* name;
+    int arr_size;
+}info;
+
 struct variables
 {
   char *name;
@@ -72,10 +77,9 @@ typedef struct{
 /* declaration */
 typedef struct{
     nodeTypes type;
+    info inf[100];
     char *pred_type;
-    char *names[100];
     int constant;
-    int *arr_size;
     int nr_declared;
 } declarNode;
 

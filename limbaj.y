@@ -75,9 +75,8 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {nodeType* temp = (nodeType*)malloc(sizeof(nodeType));temp = $2;
-                          interpret($2,1);free($2);}
-        | program function {compile($2,var_stack);interpret($2,0);free($2);}
+program : program global{interpret($2,1);freeNode($2);}
+        | program function {compile($2,var_stack);interpret($2,0);freeNode($2);}
         | /* empty */
         ;
 
@@ -260,6 +259,7 @@ nodeType *id(char *name)
 
   p->type = idType;
   p->id.name = strdup(name);
+  printf("poate? %s\n",p->id.name);
 
   return p;
 }
@@ -283,15 +283,14 @@ nodeType *dec(char *type,char **name,int constant)
   nodeType *p;
 
   // allocate node
-  if ((p = (nodeType*)malloc(sizeof(declarNode))) == NULL)
+  if ((p = (nodeType*)malloc(sizeof(declarNode) +sizeof(int)*temp_index)) == NULL)
     yyerror("cannot allocate node");
 
   p->type = declarType;
-  p->dec.arr_size = (int*)calloc(temp_index,sizeof(int));
   for(int i=0;i<temp_index;i++)
   {
-    p->dec.names[i] = strdup(temp_ids[i]);
-    p->dec.arr_size[i] = temp_arr[i];
+    p->dec.inf[i].name = strdup(temp_ids[i]);
+    p->dec.inf[i].arr_size = temp_arr[i];
   }
   p->dec.pred_type = strdup(type);
   p->dec.constant = constant;
@@ -346,6 +345,6 @@ int main(void)
 {
     yyin = fopen("program.txt","r");
     yyparse();
-    // printStack();
+    printStack();
     return 0;
 }

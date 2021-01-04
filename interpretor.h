@@ -16,6 +16,8 @@ stackType *global_last = NULL;
 
 stackType *var_stack = NULL;
 
+void printStack();
+
 stackType *exists_variable(char *name, int is_global)
 {
 
@@ -51,23 +53,23 @@ void declare_variable(declarNode node, int is_global)
             global_head = (stackType *)malloc(sizeof(stackType));
             global_head->next = NULL;
             global_head->var.value.value_type = strdup(node.pred_type);
-            global_head->var.name = strdup(node.names[0]);
+            global_head->var.name = strdup(node.inf[0].name);
             global_head->tip = 1;
-            global_head->var.array_size = node.arr_size[0];
+            global_head->var.array_size = node.inf[0].arr_size;
 
-            if(node.arr_size[0]>0)
+            if(node.inf[0].arr_size>0)
             {
                 if(strcmp(node.pred_type,"int")==0)
                 {
-                    global_head->var.value.i_array = (int*)calloc(node.arr_size[0],sizeof(int));
+                    global_head->var.value.i_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
                 }
                 if(strcmp(node.pred_type,"float")==0)
                 {
-                    global_head->var.value.f_array = (float*)calloc(node.arr_size[0],sizeof(float));
+                    global_head->var.value.f_array = (float*)calloc(node.inf[0].arr_size,sizeof(float));
                 }
                 if(strcmp(node.pred_type,"bool")==0)
                 {
-                    global_head->var.value.b_array = (int*)calloc(node.arr_size[0],sizeof(int));
+                    global_head->var.value.b_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
                 }
                 if(strcmp(node.pred_type,"string")==0 || strcmp(node.pred_type,"char")==0)
                     yyerror("cannot create array of this type");
@@ -87,23 +89,23 @@ void declare_variable(declarNode node, int is_global)
             var_stack = (stackType *)malloc(sizeof(stackType));
             var_stack->next = NULL;
             var_stack->var.value.value_type = strdup(node.pred_type);
-            var_stack->var.name = strdup(node.names[0]);
+            var_stack->var.name = strdup(node.inf[0].name);
             var_stack->tip = 1;
-            var_stack->var.array_size = node.arr_size[0];
+            var_stack->var.array_size = node.inf[0].arr_size;
 
-            if(node.arr_size[0]>0)
+            if(node.inf[0].arr_size>0)
             {
                 if(strcmp(node.pred_type,"int")==0)
                 {
-                    var_stack->var.value.i_array = (int*)calloc(node.arr_size[0],sizeof(int));
+                    var_stack->var.value.i_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
                 }
                 if(strcmp(node.pred_type,"float")==0)
                 {
-                    var_stack->var.value.f_array = (float*)calloc(node.arr_size[0],sizeof(float));
+                    var_stack->var.value.f_array = (float*)calloc(node.inf[0].arr_size,sizeof(float));
                 }
                 if(strcmp(node.pred_type,"bool")==0)
                 {
-                    var_stack->var.value.b_array = (int*)calloc(node.arr_size[0],sizeof(int));
+                    var_stack->var.value.b_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
                 }
                 if(strcmp(node.pred_type,"string")==0 || strcmp(node.pred_type,"char")==0)
                     yyerror("cannot create array of this type");
@@ -129,28 +131,28 @@ void declare_variable(declarNode node, int is_global)
 
     for (; i < node.nr_declared; i++)
     {
-        if (exists_variable(node.names[i], is_global))
+        if (exists_variable(node.inf[i].name, is_global))
             yyerror("variable already defined in current scope!");
 
         stackType *last_stack = (stackType *)malloc(sizeof(stackType));
 
         last_stack->var.value.value_type = strdup(node.pred_type);
-        last_stack->var.name = strdup(node.names[i]);
-        last_stack->var.array_size = node.arr_size[i];
+        last_stack->var.name = strdup(node.inf[i].name);
+        last_stack->var.array_size = node.inf[i].arr_size;
 
-        if(node.arr_size[0]>0)
+        if(node.inf[0].arr_size>0)
         {
             if(strcmp(node.pred_type,"int")==0)
             {
-                global_head->var.value.i_array = (int*)calloc(node.arr_size[i],sizeof(int));
+                global_head->var.value.i_array = (int*)calloc(node.inf[i].arr_size,sizeof(int));
             }
             if(strcmp(node.pred_type,"float")==0)
             {
-                global_head->var.value.f_array = (float*)calloc(node.arr_size[i],sizeof(float));
+                global_head->var.value.f_array = (float*)calloc(node.inf[i].arr_size,sizeof(float));
             }
             if(strcmp(node.pred_type,"bool")==0)
             {
-                global_head->var.value.b_array = (int*)calloc(node.arr_size[i],sizeof(int));
+                global_head->var.value.b_array = (int*)calloc(node.inf[i].arr_size,sizeof(int));
             }
             if(strcmp(node.pred_type,"string")==0 || strcmp(node.pred_type,"char")==0)
                 yyerror("cannot create array of this type");
@@ -174,6 +176,7 @@ void declare_variable(declarNode node, int is_global)
         temp->next = last_stack;
         temp->next->next = NULL;
     }
+    printStack();
 }
 
 void assign_variable(char *var_name, valueType val, int is_global,int pos)
@@ -199,8 +202,6 @@ void assign_variable(char *var_name, valueType val, int is_global,int pos)
     
     if(pos <= -1 && found->var.array_size>0)
         yyerror("operation not permitted on arrays");
-
-    printf("%d -- %d\n",pos,found->var.array_size);
 
     if(pos>=0 && found->var.array_size >0 && pos>=found->var.array_size)
         yyerror("index out of range");
@@ -243,6 +244,7 @@ void assign_variable(char *var_name, valueType val, int is_global,int pos)
             found->var.value.b_array[pos] = val.b_value;
         }
     }
+    printStack();
 }
 
 valueType get_value(char *name, int is_global,int pos)
@@ -273,22 +275,36 @@ valueType get_value(char *name, int is_global,int pos)
         yyerror("index out of range");
 
     valueType tempVal;
-
-    if (strcmp(found->var.value.value_type, "float") == 0)
-    {
-        tempVal.f_value = found->var.value.f_value;
-    }
-    if (strcmp(found->var.value.value_type, "int") == 0)
-    {
-        tempVal.i_value = found->var.value.i_value;
-    }
-    if (strcmp(found->var.value.value_type, "bool") == 0)
-    {
-        tempVal.b_value = found->var.value.b_value;
-    }
-    if (strcmp(found->var.value.value_type, "string") == 0 || strcmp(found->var.value.value_type, "char") == 0)
-    {
-        tempVal.string_value = found->var.value.string_value;
+    if(pos==-1){
+        if (strcmp(found->var.value.value_type, "float") == 0)
+        {
+            tempVal.f_value = found->var.value.f_value;
+        }
+        if (strcmp(found->var.value.value_type, "int") == 0)
+        {
+            tempVal.i_value = found->var.value.i_value;
+        }
+        if (strcmp(found->var.value.value_type, "bool") == 0)
+        {
+            tempVal.b_value = found->var.value.b_value;
+        }
+        if (strcmp(found->var.value.value_type, "string") == 0 || strcmp(found->var.value.value_type, "char") == 0)
+        {
+            tempVal.string_value = found->var.value.string_value;
+        }
+    }else{
+        if (strcmp(found->var.value.value_type, "float") == 0)
+        {
+            tempVal.f_value = found->var.value.f_array[pos];
+        }
+        if (strcmp(found->var.value.value_type, "int") == 0)
+        {
+            tempVal.i_value = found->var.value.i_array[pos];
+        }
+        if (strcmp(found->var.value.value_type, "bool") == 0)
+        {
+            tempVal.b_value = found->var.value.b_array[pos];
+        }
     }
     tempVal.value_type = strdup(found->var.value.value_type);
 
@@ -512,11 +528,13 @@ valueType interpret(nodeType *root, int is_global)
             print_value(interpret(root->opr.operands[0], is_global));
             return v;
         case ASSIGN:
-            if(root->opr.operands[0]->type == idType)
+            if(root->opr.operands[0]->type == idType){
+                if(root->opr.operands[1]->type==idType)
+                    printf("hi : %s",root->opr.operands[1]->id.name);
                 assign_variable(root->opr.operands[0]->id.name,
                                 interpret(root->opr.operands[1], is_global), is_global,-1);
-            else assign_variable(root->opr.operands[0]->idArr.name,
-                                interpret(root->opr.operands[1], is_global), is_global,root->opr.operands[1]->idArr.position);
+            }else assign_variable(root->opr.operands[0]->idArr.name,
+                                interpret(root->opr.operands[1], is_global), is_global,root->opr.operands[0]->idArr.position);
         case ';':
             interpret(root->opr.operands[0], is_global);
             return interpret(root->opr.operands[1], is_global);
