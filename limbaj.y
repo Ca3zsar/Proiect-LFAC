@@ -12,9 +12,10 @@ int yylex();
 
 nodeType *opr(int operation,int number, ...);
 nodeType *id(char *name);
+nodeType *idArray(char *name,int position);
 nodeType *constant(valueType value,char *type);
 nodeType *func(char *name,char *type,...);
-nodeType *dec(char *type,char **names,int constant,int array);
+nodeType *dec(char *type,char **names,int constant);
 
 char *temp_ids[100];
 int temp_arr[100];
@@ -107,18 +108,18 @@ function_instr : function_instr statements
                | statements
                ;
 
-declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
-           | CONST TYPE identifier {$$=dec($2,temp_ids,1,0);}
+declaration : TYPE identifier {$$=dec($1,temp_ids,0);}
+           | CONST TYPE identifier {$$=dec($2,temp_ids,1);}
            | CLASS ID '{' class_dec '}'
            | ID ID 
            ;
 
-identifier : /* identifier ',' assignation */ 
-             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=0;temp_index++;}
-            | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);temp_arr[temp_index]=$5.integer;temp_index++;}
-            | /* assignation */
-            | ID  {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=0;temp_index++;}
-            | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=$3.integer;temp_index++;}
+identifier :  identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=-1;temp_index++;}
+            | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);if($5.integer <=0)yyerror("size of array must be positive!");
+                                                temp_arr[temp_index]=$5.integer;temp_index++;}
+            | ID  {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=-1;temp_index++;}
+            | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);if($3.integer <=0)yyerror("size of array must be positive!");
+                                  temp_arr[temp_index]=$3.integer;temp_index++;}
             ;
 
 class_dec : declaration ';' class_dec
@@ -187,6 +188,7 @@ conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr
            ;
 
 expr : ID {$$=id($1);}
+     | ID '[' INT_NUM ']' {$$ = idArray($1,$3.integer);}
      | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int");}
      | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");}
      | BOOL_VAL {valueType v;
@@ -258,7 +260,21 @@ nodeType *id(char *name)
   return p;
 }
 
-nodeType *dec(char *type,char **name,int constant,int array)
+nodeType *idArray(char *name,int position)
+{
+  nodeType *p;
+  //alocate node
+  if ((p = malloc(sizeof(idArrayNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = idArrayType;
+  p->idArr.name = strdup(name);
+  p->idArr.position = position;
+
+  return p;
+}
+
+nodeType *dec(char *type,char **name,int constant)
 {
   nodeType *p;
 
@@ -267,13 +283,14 @@ nodeType *dec(char *type,char **name,int constant,int array)
     yyerror("cannot allocate node");
 
   p->type = declarType;
+  p->dec.arr_size = (int*)calloc(temp_index,sizeof(int));
   for(int i=0;i<temp_index;i++)
   {
     p->dec.names[i] = strdup(temp_ids[i]);
+    p->dec.arr_size[i] = temp_arr[i];
   }
   p->dec.pred_type = strdup(type);
   p->dec.constant = constant;
-  p->dec.arr_size = array;
   p->dec.nr_declared = temp_index;
 
   temp_index=0;

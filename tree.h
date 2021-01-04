@@ -7,10 +7,10 @@ typedef struct{
     float f_value;
     float *f_array;
     int b_value;
+    int *b_array;
     char *string_value;
     int is_true;
     char *value_type;
-    int initialised;
 }valueType;
 
 struct variables
@@ -18,6 +18,7 @@ struct variables
   char *name;
   int constant;
   int initialised;
+  int array_size;
   valueType value;
 };
 
@@ -28,7 +29,7 @@ typedef struct stk{
     struct stk *next;
 } stackType;
 
-typedef enum { constType, idType, operType, funcType,declarType} nodeTypes;
+typedef enum { constType, idType, idArrayType, operType, funcType,declarType} nodeTypes;
 typedef enum { integer, floating, string, character, boolean} predefined; 
 
 
@@ -41,9 +42,14 @@ typedef struct{
 /* identifiers */
 typedef struct{
     nodeTypes type;
-    char* id_type;
     char* name;
 } idNode;
+
+typedef struct{
+    nodeTypes type;
+    char* name;
+    int position;
+} idArrayNode;
 
 /* operators */
 typedef struct{
@@ -53,6 +59,7 @@ typedef struct{
     struct nodeTypeTag *operands[1]; 
 } operationNode;
 
+/* functions */
 typedef struct{
     nodeTypes type;
     char *name;
@@ -62,12 +69,13 @@ typedef struct{
     char *par_names[1];
 } functionNode;
 
+/* declaration */
 typedef struct{
     nodeTypes type;
     char *pred_type;
     char *names[100];
     int constant;
-    int arr_size;
+    int *arr_size;
     int nr_declared;
 } declarNode;
 
@@ -75,6 +83,7 @@ typedef struct nodeTypeTag {
     nodeTypes type;
     constNode con;
     idNode id;
+    idArrayNode idArr;
     operationNode opr;
     declarNode dec;
     functionNode fct;
