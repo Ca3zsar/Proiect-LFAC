@@ -146,6 +146,10 @@ parameter : TYPE ID
 assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
             | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
+            | ID '[' INT_NUM ']' ASSIGN expr {$$ = opr(ASSIGN,2,idArray($1,$3.integer),$6);}
+            | ID '[' INT_NUM ']' ASSIGN CHAR {valueType v;v.string_value = strdup($6);v.value_type=strdup("char");$$ = opr(ASSIGN,2,idArray($1,$3.integer),constant(v,"char"));}
+            | ID '[' INT_NUM ']' ASSIGN TEXT {valueType v;v.string_value = strdup($6);v.value_type=strdup("string");$$ = opr(ASSIGN,2,idArray($1,$3.integer),constant(v,"string"));}
+            
             ;
 
 instruction :  function_call
