@@ -271,14 +271,14 @@ expr : ID {$$=id($1);}
      | expr '*' expr {$$=opr('*',2,$1,$3);}
      | expr '/' expr {$$=opr('/',2,$1,$3);}
      | expr '%' expr {$$=opr('%',2,$1,$3);}
-     | expr EQ expr {$$=opr(EQ,2,$1,$3);}
+     | '(' expr ')' {$$ = $2;}
+     | '-' expr{$$=opr('-',1,$2);}
+     | expr EQ expr {$$=opr(EQ,2,$1,$3);} 
      | expr NE expr {$$=opr(NE,2,$1,$3);}
      | expr GT expr {$$=opr(GT,2,$1,$3);}
      | expr GE expr {$$=opr(GE,2,$1,$3);}
      | expr LT expr {$$=opr(LT,2,$1,$3);}
      | expr LE expr {$$=opr(LE,2,$1,$3);}
-     | '(' expr ')' {$$ = $2;}
-     | '-' expr{$$=opr('-',1,$2);}
      ;
 %%
 
@@ -364,6 +364,7 @@ nodeType *opr(int operation,int number, ...)
   // copy info
   p->type = operType;
   p->opr.operation = operation;
+  printf("%c op \n",p->opr.operation);
   p->opr.operNumber = number;
   va_start(ap,number);
 
