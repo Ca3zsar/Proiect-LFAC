@@ -27,7 +27,7 @@ space [' ''\t']
 
 %option noyywrap
 %%
-"if" {printf("if token\n");return IF;}
+"if" {return IF;}
 "else" {return ELSE;}
 "for" {return FOR;}
 "while" {return WHILE;}

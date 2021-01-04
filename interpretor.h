@@ -31,7 +31,7 @@ stackType *exists_variable(char *name, int is_global)
 
     while (temp_stack != NULL)
     {
-        if (strcmp(name, temp_stack->var.name) == 0)
+        if (temp_stack->tip == 1 && strcmp(name, temp_stack->var.name) == 0)
         {
             return temp_stack;
         }
@@ -52,6 +52,7 @@ void declare_variable(declarNode node, int is_global)
             global_head->next = NULL;
             global_head->var.value.value_type = strdup(node.pred_type);
             global_head->var.name = strdup(node.names[0]);
+            global_head->tip = 1;
             if (node.constant)
                 global_head->var.constant = 1;
             else
@@ -67,6 +68,7 @@ void declare_variable(declarNode node, int is_global)
             var_stack->next = NULL;
             var_stack->var.value.value_type = strdup(node.pred_type);
             var_stack->var.name = strdup(node.names[0]);
+            global_head->tip = 1;
             if (node.constant)
                 var_stack->var.constant = 1;
             else
@@ -101,6 +103,7 @@ void declare_variable(declarNode node, int is_global)
             last_stack->var.constant = 0;
 
         last_stack->next = NULL;
+        last_stack->tip = 1;
 
         stackType *temp;
         temp = current_stack;
@@ -132,6 +135,9 @@ void assign_variable(idNode node, valueType val, int is_global)
 
     if (!(found = exists_variable(var_name, is_global)))
         yyerror("variable not declared!");
+
+    if (found->var.constant == 1)
+        yyerror("cannot modify const");
 
     if (strcmp(val.value_type, found->var.value.value_type))
         yyerror("wrong type used!");
@@ -195,33 +201,51 @@ valueType get_value(char *name, int is_global)
     return tempVal;
 }
 
-void add_to_stack(stackType *next_el, int is_global)
+stackType *add_to_stack(stackType *next_el, int is_global)
 {
-    stackType *current_temp = (stackType *)malloc(sizeof(stackType));
+    stackType *current_stack = (stackType *)malloc(sizeof(stackType));
+
     if (is_global)
     {
-        current_temp = global_head;
+        if (global_head == NULL)
+        {
+            global_head = (stackType *)malloc(sizeof(stackType));
+            global_head->next = NULL;
+            global_head->tip = 0;
+            return global_head;
+        }
     }
     else
     {
-        current_temp = var_stack;
+        if (var_stack == NULL)
+        {
+            var_stack = (stackType *)malloc(sizeof(stackType));
+            var_stack->next = NULL;
+            global_head->tip = 0;
+            return var_stack;
+        }
     }
 
-    while (current_temp->next != NULL)
+    if (is_global)
     {
-        current_temp = current_temp->next;
-    }
-
-    current_temp = (stackType *)malloc(sizeof(stackType));
-    current_temp->tip = next_el->tip;
-    if (next_el->tip == 0)
-    {
-        current_temp->scope = strdup(next_el->scope);
+        current_stack = global_head;
     }
     else
     {
-        current_temp->var = next_el->var;
+        current_stack = var_stack;
     }
+
+    stackType *temp = (stackType *)malloc(sizeof(stackType));
+    temp = current_stack;
+    while (temp->next != NULL)
+    {
+        temp = temp->next;
+    }
+
+    temp->next = next_el;
+    temp->next->next = NULL;
+
+    return temp;
 }
 
 void print_value(valueType val)
@@ -266,7 +290,7 @@ void printStack()
 valueType interpret(nodeType *root, int is_global)
 {
     valueType v, v2, vcompare;
-    stackType *last;
+    stackType *last, *ante_last;
 
     // printStack();
 
@@ -290,19 +314,35 @@ valueType interpret(nodeType *root, int is_global)
         {
         case WHILE:
             last = (stackType *)malloc(sizeof(stackType));
+            ante_last = (stackType *)malloc(sizeof(stackType));
+
             last->scope = strdup("while");
             last->tip = 0;
-            add_to_stack(last, is_global);
+            ante_last = add_to_stack(last, is_global);
             while (interpret(root->opr.operands[0], is_global).is_true)
             {
                 interpret(root->opr.operands[1], is_global);
+                
+            }
+            if (ante_last == global_head)
+                global_head = NULL;
+            else
+            {
+                if (ante_last == var_stack)
+                    var_stack = NULL;
+                else
+                {
+                    ante_last->next = NULL;
+                }
             }
             return v;
         case IF:
             last = (stackType *)malloc(sizeof(stackType));
+            ante_last = (stackType *)malloc(sizeof(stackType));
+
             last->scope = strdup("if");
             last->tip = 0;
-            add_to_stack(last, is_global);
+            ante_last = add_to_stack(last, is_global);
             if (interpret(root->opr.operands[0], is_global).is_true)
             {
                 interpret(root->opr.operands[1], is_global);
@@ -312,7 +352,39 @@ valueType interpret(nodeType *root, int is_global)
                 printf("e adevarat\n");
                 interpret(root->opr.operands[2], is_global);
             }
+            if (ante_last == global_head)
+                global_head = NULL;
+            else
+            {
+                if (ante_last == var_stack)
+                    var_stack = NULL;
+                else
+                {
+                    ante_last->next = NULL;
+                }
+            }
             return v;
+        case FOR:
+            last = (stackType *)malloc(sizeof(stackType));
+            ante_last = (stackType *)malloc(sizeof(stackType));
+
+            last->scope = strdup("for");
+            last->tip = 0;
+            ante_last = add_to_stack(last, is_global);
+
+            if (ante_last == global_head)
+                global_head = NULL;
+            else
+            {
+                if (ante_last == var_stack)
+                    var_stack = NULL;
+                else
+                {
+                    ante_last->next = NULL;
+                }
+            }
+            return v;
+
         case PRINT:
             print_value(interpret(root->opr.operands[0], is_global));
             return v;
@@ -347,6 +419,9 @@ valueType interpret(nodeType *root, int is_global)
             if (strcmp(v.value_type, "string") == 0)
             {
                 v.value_type = strdup("string");
+                char *temp = strdup(v.string_value);
+                v.string_value = (char *)calloc(strlen(temp) + strlen(v2.string_value), sizeof(char));
+                strcat(v.string_value, temp);
                 strcat(v.string_value, v2.string_value);
             }
             return v;
@@ -455,222 +530,287 @@ valueType interpret(nodeType *root, int is_global)
 
             return v;
         case GE:
-            v = interpret(root->opr.operands[0],is_global);
-            v2 = interpret(root->opr.operands[1],is_global);
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
 
-            if (strcmp(v.value_type,v2.value_type))
+            if (strcmp(v.value_type, v2.value_type))
                 yyerror("can't compare different types!");
-            
-            if(strcmp(v.value_type,"int")==0)
+
+            if (strcmp(v.value_type, "int") == 0)
             {
-                if(v.i_value >= v2.i_value)
+                if (v.i_value >= v2.i_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"float")==0)
+            if (strcmp(v.value_type, "float") == 0)
             {
-                if(v.f_value >= v2.f_value)
+                if (v.f_value >= v2.f_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"bool")==0)
+            if (strcmp(v.value_type, "bool") == 0)
             {
-                if(v.b_value >= v2.b_value)
+                if (v.b_value >= v2.b_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"char")==0 || strcmp(v.value_type,"string")==0)
+            if (strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
             {
-                if(strcmp(v.string_value,v2.string_value)>=0)
+                if (strcmp(v.string_value, v2.string_value) >= 0)
                 {
-                    vcompare.is_true=1;
-                }else vcompare.is_true=0;
+                    vcompare.is_true = 1;
+                }
+                else
+                    vcompare.is_true = 0;
             }
             return vcompare;
         case GT:
-            v = interpret(root->opr.operands[0],is_global);
-            v2 = interpret(root->opr.operands[1],is_global);
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
 
-            if (strcmp(v.value_type,v2.value_type))
+            if (strcmp(v.value_type, v2.value_type))
                 yyerror("can't compare different types!");
-            
-            if(strcmp(v.value_type,"int")==0)
+
+            if (strcmp(v.value_type, "int") == 0)
             {
-                if(v.i_value > v2.i_value)
+                if (v.i_value > v2.i_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"float")==0)
+            if (strcmp(v.value_type, "float") == 0)
             {
-                if(v.f_value > v2.f_value)
+                if (v.f_value > v2.f_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"bool")==0)
+            if (strcmp(v.value_type, "bool") == 0)
             {
-                if(v.b_value > v2.b_value)
+                if (v.b_value > v2.b_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"char")==0 || strcmp(v.value_type,"string")==0)
+            if (strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
             {
-                if(strcmp(v.string_value,v2.string_value)>0)
+                if (strcmp(v.string_value, v2.string_value) > 0)
                 {
-                    vcompare.is_true=1;
-                }else vcompare.is_true=0;
+                    vcompare.is_true = 1;
+                }
+                else
+                    vcompare.is_true = 0;
             }
             return vcompare;
         case LE:
-            v = interpret(root->opr.operands[0],is_global);
-            v2 = interpret(root->opr.operands[1],is_global);
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
 
-            if (strcmp(v.value_type,v2.value_type))
+            if (strcmp(v.value_type, v2.value_type))
                 yyerror("can't compare different types!");
-            
-            if(strcmp(v.value_type,"int")==0)
+
+            if (strcmp(v.value_type, "int") == 0)
             {
-                if(v.i_value <= v2.i_value)
+                if (v.i_value <= v2.i_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"float")==0)
+            if (strcmp(v.value_type, "float") == 0)
             {
-                if(v.f_value <= v2.f_value)
+                if (v.f_value <= v2.f_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"bool")==0)
+            if (strcmp(v.value_type, "bool") == 0)
             {
-                if(v.b_value <= v2.b_value)
+                if (v.b_value <= v2.b_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"char")==0 || strcmp(v.value_type,"string")==0)
+            if (strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
             {
-                if(strcmp(v.string_value,v2.string_value)<=0)
+                if (strcmp(v.string_value, v2.string_value) <= 0)
                 {
-                    vcompare.is_true=1;
-                }else vcompare.is_true=0;
+                    vcompare.is_true = 1;
+                }
+                else
+                    vcompare.is_true = 0;
             }
             return vcompare;
         case LT:
-            v = interpret(root->opr.operands[0],is_global);
-            v2 = interpret(root->opr.operands[1],is_global);
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
 
-            if (strcmp(v.value_type,v2.value_type))
+            if (strcmp(v.value_type, v2.value_type))
                 yyerror("can't compare different types!");
-            
-            if(strcmp(v.value_type,"int")==0)
+
+            if (strcmp(v.value_type, "int") == 0)
             {
-                if(v.i_value < v2.i_value)
+                if (v.i_value < v2.i_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"float")==0)
+            if (strcmp(v.value_type, "float") == 0)
             {
-                if(v.f_value < v2.f_value)
+                if (v.f_value < v2.f_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"bool")==0)
+            if (strcmp(v.value_type, "bool") == 0)
             {
-                if(v.b_value < v2.b_value)
+                if (v.b_value < v2.b_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"char")==0 || strcmp(v.value_type,"string")==0)
+            if (strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
             {
-                if(strcmp(v.string_value,v2.string_value)<0)
+                if (strcmp(v.string_value, v2.string_value) < 0)
                 {
-                    vcompare.is_true=1;
-                }else vcompare.is_true=0;
+                    vcompare.is_true = 1;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            return vcompare;    
+            return vcompare;
         case EQ:
-            v = interpret(root->opr.operands[0],is_global);
-            v2 = interpret(root->opr.operands[1],is_global);
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
 
-            if (strcmp(v.value_type,v2.value_type))
+            if (strcmp(v.value_type, v2.value_type))
                 yyerror("can't compare different types!");
-            
-            if(strcmp(v.value_type,"int")==0)
+
+            if (strcmp(v.value_type, "int") == 0)
             {
-                if(v.i_value == v2.i_value)
+                if (v.i_value == v2.i_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"float")==0)
+            if (strcmp(v.value_type, "float") == 0)
             {
-                if(v.f_value == v2.f_value)
+                if (v.f_value == v2.f_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"bool")==0)
+            if (strcmp(v.value_type, "bool") == 0)
             {
-                if(v.b_value == v2.b_value)
+                if (v.b_value == v2.b_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"char")==0 || strcmp(v.value_type,"string")==0)
+            if (strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
             {
-                if(strcmp(v.string_value,v2.string_value)==0)
+                if (strcmp(v.string_value, v2.string_value) == 0)
                 {
-                    vcompare.is_true=1;
-                }else vcompare.is_true=0;
+                    vcompare.is_true = 1;
+                }
+                else
+                    vcompare.is_true = 0;
             }
             return vcompare;
         case NE:
-            v = interpret(root->opr.operands[0],is_global);
-            v2 = interpret(root->opr.operands[1],is_global);
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
 
-            if (strcmp(v.value_type,v2.value_type))
+            if (strcmp(v.value_type, v2.value_type))
                 yyerror("can't compare different types!");
-            
-            if(strcmp(v.value_type,"int")==0)
+
+            if (strcmp(v.value_type, "int") == 0)
             {
-                if(v.i_value != v2.i_value)
+                if (v.i_value != v2.i_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"float")==0)
+            if (strcmp(v.value_type, "float") == 0)
             {
-                if(v.f_value != v2.f_value)
+                if (v.f_value != v2.f_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"bool")==0)
+            if (strcmp(v.value_type, "bool") == 0)
             {
-                if(v.b_value != v2.b_value)
+                if (v.b_value != v2.b_value)
                 {
                     vcompare.is_true = 1;
-                }else vcompare.is_true = 0;
+                }
+                else
+                    vcompare.is_true = 0;
             }
-            if(strcmp(v.value_type,"char")==0 || strcmp(v.value_type,"string")==0)
+            if (strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
             {
-                if(strcmp(v.string_value,v2.string_value)!=0)
+                if (strcmp(v.string_value, v2.string_value) != 0)
                 {
-                    vcompare.is_true=1;
-                }else vcompare.is_true=0;
+                    vcompare.is_true = 1;
+                }
+                else
+                    vcompare.is_true = 0;
             }
             return vcompare;
-        }   
+        case AND:
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
+
+            vcompare.is_true = v.is_true && v2.is_true;
+            return vcompare;
+        case OR:
+            v = interpret(root->opr.operands[0], is_global);
+            v2 = interpret(root->opr.operands[1], is_global);
+
+            vcompare.is_true = v.is_true || v2.is_true;
+            return vcompare;
+        }
+    case NOT:
+        v = interpret(root->opr.operands[0], is_global);
+
+        vcompare.is_true = 1 - v.is_true;
+        return vcompare;
     }
 }
 

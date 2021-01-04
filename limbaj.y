@@ -61,8 +61,7 @@ void freeNode(nodeType *p);
 %type <nodePointer> assignation
 %type <nodePointer> instruction
 %type <nodePointer> conditions
-%type <nodePointer> while_check
-%type <nodePointer> if_check
+%type <nodePointer> while_check if_check for_check
 %type <nodePointer> statements interior_statements
 %type <nodePointer> global function
 %type <nodePointer> declaration
@@ -91,8 +90,9 @@ global :  statements {$$ = $1;}
 statements :declaration ';'  {$$ = $1;}
            | instruction ';'  {$$ = $1;}
            | assignation ';' {$$ = $1;}
-           | if_check 
-           | while_check
+           | if_check {$$ = $1;}
+           | while_check {$$ = $1;}
+           | for_check {$$ = $1;}
            | PRINT expr ';' {$$ = opr(PRINT,1,$2);}
            | PRINT TEXT ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"string"));}
            | PRINT CHAR ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"char"));}
@@ -112,7 +112,7 @@ function_instr : function_instr statements
                ;
 
 declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
-           | CONST TYPE identifier {$$=dec($1,temp_ids,1,0);}
+           | CONST TYPE identifier {$$=dec($2,temp_ids,1,0);}
            | CLASS ID '{' class_dec '}'
            | ID ID 
            ;
@@ -157,7 +157,7 @@ instruction :  function_call
              | ID '.' function_call
              ;
 
-function_call : ID '(' arguments ')'
+function_call : ID '(' arguments ')' 
              ;
              
 arguments : arguments ',' expr
@@ -176,6 +176,10 @@ if_check : IF '(' conditions ')' '{' interior_statements '}'
 while_check : WHILE '(' conditions ')' '{' interior_statements '}' 
                                     {$$ = opr(WHILE,2,$3,$6);}
             ;
+
+for_check : FOR '(' expr ':' expr ')' '{' interior_statements '}'
+                                    {$$ = opr(FOR,3,$3,$5,$8);}
+
 
 conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr&&expr\n");}
            | conditions OR conditions  {$$ = opr(OR,2,$1,$3);printf("expr->expr||expr\n");}
