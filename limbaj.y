@@ -152,7 +152,7 @@ void freeNode(nodeType *p);
 
 %%
 program : program global {nodeType* temp = (nodeType*)malloc(sizeof(nodeType));temp = $2;
-                          interpret($2,1);free(temp);}
+                          interpret($2,1);free($2);}
         | program function {compile($2,var_stack);interpret($2,0);free($2);}
         | /* empty */
         ;
@@ -364,7 +364,6 @@ nodeType *opr(int operation,int number, ...)
   // copy info
   p->type = operType;
   p->opr.operation = operation;
-  printf("%c op \n",p->opr.operation);
   p->opr.operNumber = number;
   va_start(ap,number);
 

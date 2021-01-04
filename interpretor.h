@@ -174,24 +174,23 @@ valueType get_value(char *name, int is_global)
 
     valueType tempVal;
 
-    stackType *tempStack = current_stack;
-    if (strcmp(tempStack->var.value.value_type, "float") == 0)
+    if (strcmp(found->var.value.value_type, "float") == 0)
     {
-        tempVal.f_value = tempStack->var.value.f_value;
+        tempVal.f_value = found->var.value.f_value;
     }
-    if (strcmp(tempStack->var.value.value_type, "int") == 0)
+    if (strcmp(found->var.value.value_type, "int") == 0)
     {
-        tempVal.i_value = tempStack->var.value.i_value;
+        tempVal.i_value = found->var.value.i_value;
     }
-    if (strcmp(tempStack->var.value.value_type, "bool") == 0)
+    if (strcmp(found->var.value.value_type, "bool") == 0)
     {
-        tempVal.b_value = tempStack->var.value.b_value;
+        tempVal.b_value = found->var.value.b_value;
     }
-    if (strcmp(tempStack->var.value.value_type, "string") == 0 || strcmp(tempStack->var.value.value_type, "char") == 0)
+    if (strcmp(found->var.value.value_type, "string") == 0 || strcmp(found->var.value.value_type, "char") == 0)
     {
-        tempVal.string_value = tempStack->var.value.string_value;
+        tempVal.string_value = found->var.value.string_value;
     }
-    tempVal.value_type = strdup(tempStack->var.value.value_type);
+    tempVal.value_type = strdup(found->var.value.value_type);
 
     return tempVal;
 }
@@ -315,6 +314,7 @@ valueType interpret(nodeType *root, int is_global)
             return v;
         case PRINT:
             print_value(interpret(root->opr.operands[0], is_global));
+            return v;
         case ASSIGN:
             assign_variable(root->opr.operands[0]->id,
                             interpret(root->opr.operands[1], is_global), is_global);
@@ -328,15 +328,22 @@ valueType interpret(nodeType *root, int is_global)
             if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0)
                 yyerror("incompatibles types for addition");
 
-            if (strcmp(v.value_type, "int") == 0)
+            if (strcmp(v.value_type, "int") == 0){
+                v.value_type = strdup("int");
                 v.i_value += v2.i_value;
-            if (strcmp(v.value_type, "float") == 0)
+            }
+            if (strcmp(v.value_type, "float") == 0){
+                v.value_type = strdup("float");
                 v.f_value += v2.f_value;
-            if (strcmp(v.value_type, "bool") == 0)
+            }
+            if (strcmp(v.value_type, "bool") == 0){
+                v.value_type = strdup("bool");
                 v.b_value = v.b_value || v2.b_value;
-            if (strcmp(v.value_type, "string") == 0)
+            }
+            if (strcmp(v.value_type, "string") == 0){
+                v.value_type = strdup("string");
                 strcat(v.string_value, v2.string_value);
-
+            }
             return v;
         case '-':
             if (root->opr.operNumber == 2)
@@ -345,14 +352,20 @@ valueType interpret(nodeType *root, int is_global)
                 v2 = interpret(root->opr.operands[1], is_global);
 
                 if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
-                    yyerror("incompatibles types for addition");
+                    yyerror("incompatibles types for substraction");
 
-                if (strcmp(v.value_type, "int") == 0)
+                if (strcmp(v.value_type, "int") == 0){
+                    v.value_type = strdup("int");
                     v.i_value -= v2.i_value;
-                if (strcmp(v.value_type, "float") == 0)
+                }
+                if (strcmp(v.value_type, "float") == 0){
+                    v.value_type = strdup("float");
                     v.f_value -= v2.f_value;
-                if (strcmp(v.value_type, "bool") == 0)
+                }
+                if (strcmp(v.value_type, "bool") == 0){
+                    v.value_type = strdup("bool");
                     v.b_value = v.b_value ^ v2.b_value;
+                }
 
                 return v;
             }
@@ -366,21 +379,76 @@ valueType interpret(nodeType *root, int is_global)
                 {
                     if (strcmp(v.value_type, "int") == 0)
                     {
+                        v.value_type = strdup("int");
                         v.i_value = -v.i_value;
                     }
                     else
                     {
+                        v.value_type = strdup("float");
                         v.f_value = -v.f_value;
                     }
                     return v;
                 }
             }
+        
+    case '*':
+        v = interpret(root->opr.operands[0], is_global);
+        v2 = interpret(root->opr.operands[1], is_global);
+
+        if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
+            yyerror("incompatibles types for multipication");
+
+        if (strcmp(v.value_type, "int") == 0){
+            v.value_type = strdup("int");
+            v.i_value *= v2.i_value;
+        }
+        if (strcmp(v.value_type, "float") == 0){
+            v.value_type = strdup("float");
+            v.f_value *= v2.f_value;
+        }
+
+        return v;
+    case '/':
+        v = interpret(root->opr.operands[0], is_global);
+        v2 = interpret(root->opr.operands[1], is_global);
+
+        if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
+            yyerror("incompatibles types for division");
+
+        if (strcmp(v.value_type, "int") == 0)
+        {
+            if (v2.i_value == 0)
+                yyerror("division by 0 not permitted!");
+            v.value_type = strdup("int");
+            v.i_value /= v2.i_value;
+        }
+        if (strcmp(v.value_type, "float") == 0)
+        {
+            if (v2.f_value == 0.0)
+                yyerror("division by 0 not permitted!");
+            v.value_type = strdup("float");
+            v.f_value /= v2.f_value;
+        }
+        return v;
+    case '%':
+        v = interpret(root->opr.operands[0], is_global);
+        v2 = interpret(root->opr.operands[1], is_global);
+
+        if (strcmp(v.value_type, "int") || strcmp(v.value_type, "int"))
+            yyerror("only integers can be used for modulo!");
+
+        if (strcmp(v.value_type, "int") == 0){
+            v.value_type = strdup("int");
+            v.i_value %= v2.i_value;
+        }
+
+        return v;
         }
     }
 }
 
-    void yyerror(const char *s)
-    {
-        printf("eroare: %s la linia:%d\n", s, yylineno);
-        exit(0);
-    }
+void yyerror(const char *s)
+{
+    printf("eroare: %s la linia:%d\n", s, yylineno);
+    exit(0);
+}
