@@ -54,6 +54,9 @@ space [' ''\t']
 "class" {yylval.string = strdup(yytext);
         return CLASS;}
 
+"eval" {yylval.string = strdup(yytext);
+        return EVAL;}
+
 {number} {yylval.num = (struct number){atoi(yytext),0,0};
          return INT_NUM;}
 

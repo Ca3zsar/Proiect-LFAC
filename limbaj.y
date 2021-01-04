@@ -17,6 +17,7 @@ nodeType *func(char *name,char *type,...);
 nodeType *dec(char *type,char **names,int constant,int array);
 
 char *temp_ids[100];
+int temp_arr[100];
 int temp_index;
 
 void freeNode(nodeType *p);
@@ -33,7 +34,6 @@ void freeNode(nodeType *p);
 %token <string>TYPE
 %token <string>CHAR 
 %token <string>TEXT
-%token <string>ARRAY
 %token <string>CLASS
 %token <num>INT_NUM
 %token <num> FLOAT_NUM
@@ -42,12 +42,7 @@ void freeNode(nodeType *p);
 %token <string>ELSE
 %token <string>FOR
 %token <string>WHILE
-%token <string>GT
-%token <string>GE
-%token <string>LT
-%token <string>LE
-%token <string>NE
-%token <string>EQ
+%token <string>GT GE LT LE NE EQ
 %token <string>AND
 %token <string>OR
 %token <string>ASSIGN
@@ -55,6 +50,7 @@ void freeNode(nodeType *p);
 %token <string> CONST
 %token <string> NOT
 %token <string> RETURN
+%token <string> EVAL
 %token PRINT
 
 %type <nodePointer> expr
@@ -118,11 +114,11 @@ declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
            ;
 
 identifier : /* identifier ',' assignation */ 
-             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_index++;}
-            | identifier ',' ARRAY 
+             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=0;temp_index++;}
+            | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);temp_arr[temp_index]=$5.integer;temp_index++;}
             | /* assignation */
-            | ID  {temp_ids[temp_index] = strdup($1);temp_index++;}
-            | ARRAY
+            | ID  {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=0;temp_index++;}
+            | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=$3.integer;temp_index++;}
             ;
 
 class_dec : declaration ';' class_dec
@@ -152,6 +148,7 @@ assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             ;
 
 instruction :  function_call
+             | EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
              | expr {$$ = $1;}
              | ID '.' ID
              | ID '.' function_call

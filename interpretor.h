@@ -370,26 +370,50 @@ valueType interpret(nodeType *root, int is_global)
             }
         return v;
         case FOR:
-            last = (stackType *)malloc(sizeof(stackType));
-            ante_last = (stackType *)malloc(sizeof(stackType));
 
-            last->scope = strdup("for");
-            last->tip = 0;
-            ante_last = add_to_stack(last, is_global);
+            if(root->opr.operands[0]->type != constType || root->opr.operands[1]->type != constType)
+                yyerror("only constant values in -for- syntax");
+            if(strcmp(root->opr.operands[0]->con.value.value_type,"int") ||
+              strcmp(root->opr.operands[1]->con.value.value_type,"int"))
+                yyerror("only int const in -for- syntax");
 
-            if (ante_last == global_head)
-                global_head = NULL;
-            else
+            int start = root->opr.operands[0]->con.value.i_value;
+            int final = root->opr.operands[1]->con.value.i_value;          
+
+            while(start<=final)
             {
-                if (ante_last == var_stack)
-                    var_stack = NULL;
+                last = (stackType *)malloc(sizeof(stackType));
+                ante_last = (stackType *)malloc(sizeof(stackType));
+
+                last->scope = strdup("while");
+                last->tip = 0;
+                ante_last = add_to_stack(last, is_global);
+
+                interpret(root->opr.operands[2], is_global);
+
+                if (ante_last == NULL){
+                    if(is_global){
+                        global_head = NULL;
+                    }else{
+                        var_stack = NULL;
+                    }
+                }
                 else
                 {
                     ante_last->next = NULL;
                 }
+
+                start++;
             }
             return v;
+        case EVAL:
+            v = interpret(root->opr.operands[0],is_global);
 
+            if(strcmp(v.value_type,"int"))
+                yyerror("Eval function only take int expressions!");
+
+            print_value(v);
+            return v;
         case PRINT:
             print_value(interpret(root->opr.operands[0], is_global));
             return v;
@@ -821,6 +845,6 @@ valueType interpret(nodeType *root, int is_global)
 
 void yyerror(const char *s)
 {
-    printf("eroare: %s la linia:%d\n", s, yylineno);
+    printf("ERROR AT LINE %d : %s \n", yylineno,s);
     exit(0);
 }
