@@ -212,7 +212,7 @@ stackType *add_to_stack(stackType *next_el, int is_global)
             global_head = (stackType *)malloc(sizeof(stackType));
             global_head->next = NULL;
             global_head->tip = 0;
-            return global_head;
+            return 0;
         }
     }
     else
@@ -222,7 +222,7 @@ stackType *add_to_stack(stackType *next_el, int is_global)
             var_stack = (stackType *)malloc(sizeof(stackType));
             var_stack->next = NULL;
             global_head->tip = 0;
-            return var_stack;
+            return 0;
         }
     }
 
@@ -279,8 +279,13 @@ void printStack()
         temp = global_head;
         while (temp != NULL)
         {
-            printf("%s :: \n", temp->var.name);
-            print_value(temp->var.value);
+            if(temp->tip==1){
+                printf("%s :: ", temp->var.name);
+                print_value(temp->var.value);
+            }
+            else{
+                printf("%s :: scope\n",temp->scope);
+            }
             temp = temp->next;
         }
         printf("-----\n");
@@ -313,23 +318,24 @@ valueType interpret(nodeType *root, int is_global)
         switch (root->opr.operation)
         {
         case WHILE:
-            last = (stackType *)malloc(sizeof(stackType));
-            ante_last = (stackType *)malloc(sizeof(stackType));
-
-            last->scope = strdup("while");
-            last->tip = 0;
-            ante_last = add_to_stack(last, is_global);
             while (interpret(root->opr.operands[0], is_global).is_true)
             {
+                last = (stackType *)malloc(sizeof(stackType));
+                ante_last = (stackType *)malloc(sizeof(stackType));
+
+                last->scope = strdup("while");
+                last->tip = 0;
+                ante_last = add_to_stack(last, is_global);
+
                 interpret(root->opr.operands[1], is_global);
-                
-            }
-            if (ante_last == global_head)
-                global_head = NULL;
-            else
-            {
-                if (ante_last == var_stack)
-                    var_stack = NULL;
+
+                if (ante_last == NULL){
+                    if(is_global){
+                        global_head = NULL;
+                    }else{
+                        var_stack = NULL;
+                    }
+                }
                 else
                 {
                     ante_last->next = NULL;
@@ -349,21 +355,20 @@ valueType interpret(nodeType *root, int is_global)
             }
             else if (root->opr.operNumber > 2)
             {
-                printf("e adevarat\n");
                 interpret(root->opr.operands[2], is_global);
             }
-            if (ante_last == global_head)
-                global_head = NULL;
-            else
-            {
-                if (ante_last == var_stack)
+            if (ante_last == NULL){
+                if(is_global){
+                    global_head = NULL;
+                }else{
                     var_stack = NULL;
-                else
-                {
-                    ante_last->next = NULL;
                 }
             }
-            return v;
+            else
+            {
+                ante_last->next = NULL;
+            }
+        return v;
         case FOR:
             last = (stackType *)malloc(sizeof(stackType));
             ante_last = (stackType *)malloc(sizeof(stackType));
