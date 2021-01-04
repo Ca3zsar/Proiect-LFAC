@@ -10,78 +10,6 @@
 
 int yylex();
 
-/*
-void add_to_temp(char *type,char* name,value_t value,int initialised)
-{
-  temp[index_temp].type = strdup(type);
-  temp[index_temp].name = strdup(name);
-
-  if(initialised){
-    if(strcmp(type,"int")==0)
-    {
-      temp[index_temp].value.int_value = value.int_value;
-    }
-    if(strcmp(type,"float")==0)
-    {
-      temp[index_temp].value.float_value = value.float_value;
-    }
-    if(strcmp(type,"string")==0 || strcmp(type,"char")==0)
-    {
-      temp[index_temp].value.content = strdup(value.content);
-    }
-  }
-  temp[index_temp].initialised = initialised;
-  index_temp ++;
-}
-
-void modify_linked()
-{
-  for(int i=0;i<index_temp;i++)
-  {
-    int found = 0;
-    global_current = global_head;
-    while(global_current!=NULL)
-    {
-      if(strcmp(temp[i].name,global_current->name)==0)
-      {
-        if(strcmp(global_current->type,temp[i].type))
-        {
-          yyerror("incompatible types!");
-        }
-
-        if(global_current->constant==1)
-        {
-          yyerror("cannot modify const");
-        }
-
-        if(strcmp(global_current->type,"int")==0)
-        {
-          global_current->value.int_value = temp[i].value.int_value;
-        }
-        if(strcmp(global_current->type,"float")==0){
-          global_current->value.float_value = temp[i].value.float_value;
-        }
-        if(strcmp(global_current->type,"char")==0 || strcmp(global_current->type,"string")==0)
-        {
-          global_current->value.content = strdup(temp[i].value.content);
-        }
-
-        global_current->initialised = 1;
-        
-        found = 1;
-        break;
-      }
-      global_current = global_current->next;
-    }
-    if(!found)
-    {
-      yyerror("variable not declared!");
-    }
-  }
-  index_temp = 0;
-}
-*/
-
 nodeType *opr(int operation,int number, ...);
 nodeType *id(char *name);
 nodeType *constant(valueType value,char *type);
@@ -166,12 +94,14 @@ statements :declaration ';'  {$$ = $1;}
            | if_check 
            | while_check
            | PRINT expr ';' {$$ = opr(PRINT,1,$2);}
+           | PRINT TEXT ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"string"));}
+           | PRINT CHAR ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"char"));}
            | RETURN expr ';'
            ;
 
 
-interior_statements : interior_statements statements
-                    | statements
+interior_statements : statements { $$ = $1;}
+                    | interior_statements statements {$$ = opr(';',2,$1,$2);}
                     ;
 
 function : TYPE ID '(' parameter_list ')' '{' function_instr '}'
