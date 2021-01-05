@@ -69,7 +69,7 @@ void freeNode(nodeType *p);
 %type <nodePointer> instruction
 %type <nodePointer> conditions
 %type <nodePointer> while_check if_check for_check
-%type <nodePointer> statements interior_statements function_instr
+%type <nodePointer> statements interior_statements function_instr class_instr
 %type <nodePointer> global function
 %type <nodePointer> declaration
 
@@ -121,7 +121,7 @@ function_instr : statements {$$ = $1;}
 declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
            | CONST TYPE identifier {$$=dec($2,temp_ids,1,0);}
            | CLASS ID '{' class_dec '}' {assign_class($2);}
-           | ID ID '('  ')'
+           | ID ID '(' arguments  ')'
            ;
 
 identifier : /* identifier ',' assignation */ 
@@ -134,19 +134,22 @@ identifier : /* identifier ',' assignation */
 
 class_dec : declaration ';' class_dec
           | declaration ';'
-          | ID '(' parameter_list ')' '{' class_instr'}'
-          | class_function class_dec 
+          | class_function  class_dec
           | class_function 
           ;
 
 class_function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
                                            opr('f',2,dec_functions[func_index]=function($1,$2,1),$7);func_index++;}
+               | ID '(' parameter_list ')' '{' class_instr'}' {fct_to_run[func_index] = 
+                                                          opr('f',2,dec_functions[func_index]=function("constructor",$1,1),$6);func_index++;}
                ;
 
-class_instr : class_instr declaration ';'
-            | class_instr instruction ';'
-            | class_instr assignation ';'
-            | class_instr PRINT ';'
+class_instr : class_instr declaration ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr instruction ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr assignation ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr PRINT expr ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
+            | class_instr PRINT TEXT ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
+            | class_instr PRINT CHAR ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
             | /* empty */
 
 parameter_list : TYPE ID {par_types[par_index]=strdup($1);par[par_index]=strdup($2);par_index++;}
@@ -157,6 +160,9 @@ parameter_list : TYPE ID {par_types[par_index]=strdup($1);par[par_index]=strdup(
 assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
             | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
+            | ID '[' INT_NUM ']' ASSIGN expr
+            | ID '[' INT_NUM ']' ASSIGN CHAR
+            | ID '[' INT_NUM ']' ASSIGN TEXT
             ;
 
 instruction :  function_call
@@ -166,7 +172,7 @@ instruction :  function_call
              | ID '.' function_call
              ;
 
-function_call : ID '(' arguments ')' 
+function_call : ID '(' arguments ')' {}
              ;
              
 arguments : arguments ',' expr
@@ -212,7 +218,7 @@ expr : ID {$$=id($1);}
                 v.value_type=strdup("bool");
                 $$=constant(v,"bool");
                 }
-     
+     | ID '[' INT_NUM ']'
      | expr '+' expr {$$=opr('+',2,$1,$3);}
      | expr '-' expr {$$=opr('-',2,$1,$3);}
      | expr '*' expr {$$=opr('*',2,$1,$3);}
@@ -338,6 +344,7 @@ nodeType *function(char *type,char *name,int inClass)
   p->type = funcType;
   p->fct.name = strdup(name);
   p->fct.par_number = par_index;
+  printf("%s -- %d\n",name,par_index);
   p->fct.return_type = strdup(type);
   p->fct.class_name = NULL;
   p->fct.in_class = inClass;

@@ -513,6 +513,18 @@ valueType interpret(nodeType *root, int is_global)
             v = interpret(root->opr.operands[0], is_global);
             v2 = interpret(root->opr.operands[1], is_global);
 
+            if(strcmp(v.value_type,"string")==0 && strcmp(v2.value_type,"int")==0)
+            {
+                v.value_type = strdup("string");
+                char *temp = strdup(v.string_value);
+                v.string_value = (char*)calloc(strlen(temp)*v2.i_value,sizeof(char));
+                for(int i=0;i<v2.i_value;i++)
+                {
+                    strcat(v.string_value,temp);
+                }
+                return v;
+            }
+
             if (strcmp(v.value_type, v2.value_type) || strcmp(v.value_type, "char") == 0 || strcmp(v.value_type, "string") == 0)
                 yyerror("incompatibles types for multipication");
 
@@ -526,6 +538,7 @@ valueType interpret(nodeType *root, int is_global)
                 v.value_type = strdup("float");
                 v.f_value *= v2.f_value;
             }
+            
 
             return v;
         case '/':
