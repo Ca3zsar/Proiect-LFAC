@@ -18,6 +18,8 @@ nodeType *dec(char *type,char **names,int constant,int array);
 nodeType *function(char *type,char *name,int inClass);
 
 int exists_function(char *return_type,char *name,int inClass);
+int search_function(char *name,int inClass);
+void create_stack(int f_index);
 void assign_class(char *class_n);
 void freeNode(nodeType *p);
 
@@ -155,15 +157,17 @@ assignement : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID '[' INT_NUM ']' ASSIGN TEXT
             ;
 
-instruction :  function_call 
+instruction :  function_call {$$=$1;}
              | EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
              | expr {$$ = $1;}
              | ID '.' ID
              | ID '.' ID '(' arguments ')'
              ;
 
-function_call : ID '(' arguments ')' {
-
+function_call : ID '(' arguments ')' { int a = search_function($1,0);if(a==-1)yyerror("cannot find function with specified signature");
+                                      var_stack[a] = NULL; general_scope=a;
+                                      create_stack(a); par_index=0;                                      
+                                      $$ = fct_to_run[a];
                                       }
              ;
              
@@ -175,24 +179,24 @@ arguments : arguments ',' expr {valueType v=interpret($3,general_scope);
                                         par_types[par_index] = strdup(v.value_type);
                                         temp_var[par_index].value = v; par_index++;
                                        }
-          | arguments ',' TEXT {  valueType vtemp ; vtemp.string_value = strdup($3);
-                                valueType v=interpret(constant(vtemp,"char"),general_scope);
+          | arguments ',' TEXT {  valueType vtemp ; vtemp.string_value = strdup($3); vtemp.value_type=strdup("string");
+                                valueType v=interpret(constant(vtemp,"string"),general_scope);
                                 par_types[par_index] = strdup(v.value_type);
                                 temp_var[par_index].value = v; par_index++;
                               }
-          | arguments ',' CHAR {  valueType vtemp ; vtemp.string_value = strdup($3);
+          | arguments ',' CHAR {  valueType vtemp ; vtemp.string_value = strdup($3); vtemp.value_type=strdup("char");
                                   valueType v=interpret(constant(vtemp,"char"),general_scope);
                                   par_types[par_index] = strdup(v.value_type);
                                   temp_var[par_index].value = v; par_index++;
                                 }
 
-          | CHAR {  valueType vtemp ; vtemp.string_value = strdup($1);
+          | CHAR {  valueType vtemp ; vtemp.string_value = strdup($1); vtemp.value_type=strdup("char");
                     valueType v=interpret(constant(vtemp,"char"),general_scope);
                     par_types[par_index] = strdup(v.value_type);
                     temp_var[par_index].value = v; par_index++;
                  }
-          | TEXT {  valueType vtemp ; vtemp.string_value = strdup($1);
-                    valueType v=interpret(constant(vtemp,"char"),general_scope);
+          | TEXT {  valueType vtemp ; vtemp.string_value = strdup($1); vtemp.value_type=strdup("string");
+                    valueType v=interpret(constant(vtemp,"string"),general_scope);
                     par_types[par_index] = strdup(v.value_type);
                     temp_var[par_index].value = v; par_index++;
                  }
@@ -380,9 +384,73 @@ nodeType *function(char *type,char *name,int inClass)
   return p;
 }
 
+void create_stack(int f_index)
+{
+  if(par_index)
+  {
+    int j = 0;
+
+    var_stack[f_index] = (stackType *)malloc(sizeof(stackType));
+    var_stack[f_index]->next = NULL;
+    var_stack[f_index]->var.value = temp_var[0].value;
+    var_stack[f_index]->var.name = strdup(dec_functions[f_index]->fct.par_names[0]);
+    var_stack[f_index]->tip = 1;
+    var_stack[f_index]->var.initialised = 1;
+    var_stack[f_index]->var.constant = 0;
+    
+    j++;
+
+    for (; j < par_index; j++)
+    {
+      stackType *last_stack = (stackType *)malloc(sizeof(stackType));
+
+      last_stack->var.value = temp_var[j].value;
+      last_stack->var.name = strdup(dec_functions[f_index]->fct.par_names[j]);
+      last_stack->var.constant = 0;
+      last_stack->next = NULL;
+      last_stack->tip = 1;
+      last_stack->var.initialised = 1;
+
+      stackType *temp;
+      temp = var_stack[f_index];
+      while (temp->next != NULL)
+      {
+          temp = temp->next;
+      }
+
+      temp->next = last_stack;
+      temp->next->next = NULL;
+    }
+    
+
+  }
+}
+
 int search_function(char *name,int inClass)
 {
-
+  for(int i=0;i<func_index;i++)
+  {
+    if(dec_functions[i]->fct.in_class == inClass)
+    {
+      if(strcmp(dec_functions[i]->fct.name,name)==0)
+      {
+        if(dec_functions[i]->fct.par_number == par_index)
+        {
+          int ok=0;
+          for(int j=0;j<par_index;j++)
+          {
+            if(strcmp(dec_functions[i]->fct.par_types[j],par_types[j]))
+              ok = 1;
+            
+            if(ok)
+              break;
+          }
+          if(!ok)return i;
+        }
+      }
+    }
+  }
+  return -1;
 }
 
 int exists_function(char *return_type,char *name,int inClass)
