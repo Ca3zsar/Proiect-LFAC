@@ -324,25 +324,8 @@ valueType interpret(nodeType *root, int is_global)
         switch (root->opr.operation)
         {
         case 'f':
-            last = (stackType *)malloc(sizeof(stackType));
-            ante_last = (stackType *)malloc(sizeof(stackType));
-            last->scope = strdup(root->opr.operands[0]->fct.name);
-            last->tip = 0;
-            ante_last = add_to_stack(last, is_global);
-
             interpret(root->opr.operands[1],is_global);
 
-            if (ante_last == NULL){
-                if(is_global==-1){
-                    global_head = NULL;
-                }else{
-                    var_stack[is_global] = NULL;
-                }
-            }
-            else
-            {
-                ante_last->next = NULL;
-            }
             return v_global;
         case RETURN:
             v_global = interpret(root->opr.operands[0],is_global);

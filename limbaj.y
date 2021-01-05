@@ -564,8 +564,6 @@ void create_table()
     temp=global_head;
     while(temp!=NULL)
     {
-      fprintf(symbol," <global> %s %s = ",temp->var.value.value_type,temp->var.name);
-
       if(temp->var.constant)
         fprintf(symbol," <global> const %s %s = ",temp->var.value.value_type,temp->var.name);
       else {
@@ -591,6 +589,53 @@ void create_table()
               fprintf(symbol,"True\n");
       }
       temp=temp->next;
+    }
+    int i=0;
+    for(;i<func_index;i++){
+      fprintf(symbol,"\n:::: %s VARIABLES ::::\n",dec_functions[i]->fct.name);
+      fprintf(symbol,"function arguments : \n");
+      if(dec_functions[i]->fct.par_number)
+      {
+        for(int j=0;j<dec_functions[i]->fct.par_number;j++)
+        {
+          fprintf(symbol, "\t%s %s\n",dec_functions[i]->fct.par_types[j],dec_functions[i]->fct.par_names[j]); 
+        }
+      }else{
+        fprintf(symbol,"None");
+      }
+      fprintf(symbol,"function stack :\n");
+      stackType *temp;
+      temp = var_stack[i];
+      while (temp != NULL)
+      {
+          if(temp->tip){
+            if(temp->var.constant)
+              fprintf(symbol," <%s> const %s %s = ",dec_functions[i]->fct.name,temp->var.value.value_type,temp->var.name);
+            else {
+              fprintf(symbol," <%s> %s %s = ",dec_functions[i]->fct.name,temp->var.value.value_type,temp->var.name);
+            }
+            if (strcmp(temp->var.value.value_type, "int") == 0)
+            {
+                fprintf(symbol,"%d\n", temp->var.value.i_value);
+            }
+            if (strcmp(temp->var.value.value_type, "float") == 0)
+            {
+                fprintf(symbol,"%f\n", temp->var.value.f_value);
+            }
+            if (strcmp(temp->var.value.value_type, "string") == 0 || strcmp(temp->var.value.value_type, "char") == 0)
+            {
+                fprintf(symbol,"\"%s\"\n", temp->var.value.string_value);
+            }
+            if (strcmp(temp->var.value.value_type, "bool") == 0)
+            {
+            if (temp->var.value.b_value == 0)
+                fprintf(symbol,"False\n");
+            else
+                fprintf(symbol,"True\n");
+            }
+          }
+          temp = temp->next;
+      }
     }
   }
 }
