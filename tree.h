@@ -30,7 +30,6 @@ typedef struct stk{
 
 typedef enum { constType, idType, operType, funcType,declarType} nodeTypes;
 
-
 /* constant values */
 typedef struct{
     nodeTypes type;
@@ -80,5 +79,18 @@ typedef struct nodeTypeTag {
     declarNode dec;
     functionNode fct;
 } nodeType;
+
+
+nodeType *dec_functions[100];
+nodeType *fct_to_run[100];
+int func_index=0;
+
+char *par_types[100];
+char *par[100];
+int par_index;
+
+char *temp_ids[100];
+int temp_arr[100];
+int temp_index;
 
 #endif

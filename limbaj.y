@@ -17,18 +17,6 @@ nodeType *func(char *name,char *type,...);
 nodeType *dec(char *type,char **names,int constant,int array);
 nodeType *function(char *type,char *name,int inClass);
 
-nodeType *dec_functions[100];
-nodeType *fct_to_run[100];
-int func_index=0;
-
-char *par_types[100];
-char *par[100];
-int par_index;
-
-char *temp_ids[100];
-int temp_arr[100];
-int temp_index;
-
 int exists_function(char *return_type,char *name,int inClass);
 void assign_class(char *class_n);
 void freeNode(nodeType *p);
@@ -85,8 +73,8 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {interpret($2,1);}
-        | program function {compile($2,var_stack);interpret($2,0);freeNode($2);}
+program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;compile(temp,-1);interpret($2,-1);}
+        | program function {compile($2,0);interpret($2,0);freeNode($2);}
         | /* empty */
         ;
 
@@ -169,7 +157,7 @@ instruction :  function_call
              | EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
              | expr {$$ = $1;}
              | ID '.' ID
-             | ID '.' function_call
+             | ID '.' ID '(' arguments ')'
              ;
 
 function_call : ID '(' arguments ')' {}
@@ -344,7 +332,6 @@ nodeType *function(char *type,char *name,int inClass)
   p->type = funcType;
   p->fct.name = strdup(name);
   p->fct.par_number = par_index;
-  printf("%s -- %d\n",name,par_index);
   p->fct.return_type = strdup(type);
   p->fct.class_name = NULL;
   p->fct.in_class = inClass;
@@ -449,6 +436,7 @@ void create_table()
 {
   FILE *symbol = fopen("symbol_table.txt","w");
   // Print the functions.
+  fprintf(symbol,":::: FUNCTIONS ::::\n");
   for(int i=0;i<func_index;i++)
     {
       fprintf(symbol,"%s ",dec_functions[i]->fct.return_type);
@@ -469,13 +457,18 @@ void create_table()
       }
       fprintf(symbol,"----------\n");
     }
+  fprintf(symbol,"\n:::: GLOBAL VARIABLES ::::\n");
+  stackType *temp = (stackType*)malloc(sizeof(stackType));
+  
 }
 
 int main(void)
 {
     yyin = fopen("program.txt","r");
+    symbol = fopen("symbol_table.txt","w");
     yyparse();
-    create_table();
+    interpret(fct_to_run[0],0);
+    // create_table();
     // printStack();
     
     return 0;

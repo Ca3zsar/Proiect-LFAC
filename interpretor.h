@@ -227,7 +227,7 @@ stackType *add_to_stack(stackType *next_el, int is_global)
         {
             var_stack = (stackType *)malloc(sizeof(stackType));
             var_stack->next = NULL;
-            global_head->tip = 0;
+            var_stack->tip = 0;
             return 0;
         }
     }
@@ -323,6 +323,26 @@ valueType interpret(nodeType *root, int is_global)
     case operType:
         switch (root->opr.operation)
         {
+        case 'f':
+            last = (stackType *)malloc(sizeof(stackType));
+            ante_last = (stackType *)malloc(sizeof(stackType));
+            last->scope = strdup(root->opr.operands[0]->fct.name);
+            last->tip = 0;
+            ante_last = add_to_stack(last, is_global);
+
+            interpret(root->opr.operands[1],is_global);
+
+            if (ante_last == NULL){
+                if(is_global){
+                    global_head = NULL;
+                }else{
+                    var_stack = NULL;
+                }
+            }
+            else
+            {
+                ante_last->next = NULL;
+            }
         case WHILE:
             while (interpret(root->opr.operands[0], is_global).is_true)
             {
