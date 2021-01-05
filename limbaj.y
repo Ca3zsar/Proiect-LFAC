@@ -20,6 +20,7 @@ int exists_function(char *return_type,char *name,int inClass);
 int search_function(char *name,int inClass);
 void create_stack(int f_index);
 void assign_class(char *class_n);
+void assign_variables(char *class_n);
 void freeNode(nodeType *p);
 
 int general_scope=-1;
@@ -111,7 +112,7 @@ function_instr : statements {$$ = $1;}
 
 declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
            | CONST TYPE identifier {$$=dec($2,temp_ids,1,0);}
-           | CLASS ID '{' class_dec '}' {assign_class($2);}
+           | CLASS ID '{' class_dec '}' {assign_class($2);assign_variables($2);class_index++;}
            | ID ID '(' arguments  ')'
            ;
 
@@ -123,11 +124,15 @@ identifier : /* identifier ',' assignement */
             | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=$3.integer;temp_index++;}
             ;
 
-class_dec : declaration ';' class_dec
-          | declaration ';'
+class_dec : class_declaration ';' class_dec
+          | class_declaration ';'
           | class_function  class_dec
           | class_function 
           ;
+
+class_declaration : TYPE identifier {declarations[dec_index]=dec($1,temp_ids,0,0);dec_index++;}
+                  | CONST TYPE identifier {declarations[dec_index]=dec($2,temp_ids,1,0);dec_index++;}
+                  ;
 
 class_function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
                                            opr('f',2,dec_functions[func_index]=function($1,$2,1),$7);func_index++;}
@@ -509,10 +514,32 @@ void assign_class(char *class_n)
     {
       if(dec_functions[i]->fct.class_name == NULL)
       {
+        if(strcmp(dec_functions[i]->fct.return_type,"constructor")==0)
+        {
+          if(strcmp(dec_functions[i]->fct.name,class_n))
+            yyerror("constructor of class needs to have the same name as class");
+        }
         dec_functions[i]->fct.class_name = strdup(class_n);
       }
     }
   }
+}
+
+void assign_variables(char *class_n)
+{
+  int ind=0;
+  temp_class[class_index].class_name = strdup(class_n);
+  for(int i=0;i<dec_index;i++)
+  {
+    for(int j=0;j<declarations[i]->dec.nr_declared;j++)
+    {
+        temp_class[class_index].type[ind] = strdup(declarations[i]->dec.pred_type);
+        temp_class[class_index].names[ind] = strdup(declarations[i]->dec.names[j]);
+        temp_class[class_index].constant[ind] = declarations[i]->dec.constant;
+        ind++;
+    }
+  }
+  temp_class[class_index].nr_var = ind;
 }
 
 void freeNode(nodeType *p)
@@ -590,51 +617,67 @@ void create_table()
       }
       temp=temp->next;
     }
-    int i=0;
-    for(;i<func_index;i++){
-      fprintf(symbol,"\n:::: %s VARIABLES ::::\n",dec_functions[i]->fct.name);
-      fprintf(symbol,"function arguments : \n");
-      if(dec_functions[i]->fct.par_number)
+  }else{
+    fprintf(symbol,"\tNone\n");
+  }
+  int i=0;
+  for(;i<func_index;i++){
+    fprintf(symbol,"\n:::: %s VARIABLES ::::\n",dec_functions[i]->fct.name);
+    fprintf(symbol,"function arguments : \n");
+    if(dec_functions[i]->fct.par_number)
+    {
+      for(int j=0;j<dec_functions[i]->fct.par_number;j++)
       {
-        for(int j=0;j<dec_functions[i]->fct.par_number;j++)
-        {
-          fprintf(symbol, "\t%s %s\n",dec_functions[i]->fct.par_types[j],dec_functions[i]->fct.par_names[j]); 
-        }
-      }else{
-        fprintf(symbol,"None");
+        fprintf(symbol, "\t%s %s\n",dec_functions[i]->fct.par_types[j],dec_functions[i]->fct.par_names[j]); 
       }
-      fprintf(symbol,"function stack :\n");
-      stackType *temp;
-      temp = var_stack[i];
-      while (temp != NULL)
-      {
-          if(temp->tip){
-            if(temp->var.constant)
-              fprintf(symbol," <%s> const %s %s = ",dec_functions[i]->fct.name,temp->var.value.value_type,temp->var.name);
-            else {
-              fprintf(symbol," <%s> %s %s = ",dec_functions[i]->fct.name,temp->var.value.value_type,temp->var.name);
-            }
-            if (strcmp(temp->var.value.value_type, "int") == 0)
-            {
-                fprintf(symbol,"%d\n", temp->var.value.i_value);
-            }
-            if (strcmp(temp->var.value.value_type, "float") == 0)
-            {
-                fprintf(symbol,"%f\n", temp->var.value.f_value);
-            }
-            if (strcmp(temp->var.value.value_type, "string") == 0 || strcmp(temp->var.value.value_type, "char") == 0)
-            {
-                fprintf(symbol,"\"%s\"\n", temp->var.value.string_value);
-            }
-            if (strcmp(temp->var.value.value_type, "bool") == 0)
-            {
-            if (temp->var.value.b_value == 0)
-                fprintf(symbol,"False\n");
-            else
-                fprintf(symbol,"True\n");
-            }
+    }else{
+      fprintf(symbol,"\tNone\n");
+    }
+    fprintf(symbol,"function stack :\n");
+    stackType *temp;
+    temp = var_stack[i];
+    while (temp != NULL)
+    {
+        if(temp->tip){
+          if(temp->var.constant)
+            fprintf(symbol," <%s> const %s %s = ",dec_functions[i]->fct.name,temp->var.value.value_type,temp->var.name);
+          else {
+            fprintf(symbol," <%s> %s %s = ",dec_functions[i]->fct.name,temp->var.value.value_type,temp->var.name);
           }
-          temp = temp->next;
+          if (strcmp(temp->var.value.value_type, "int") == 0)
+          {
+              fprintf(symbol,"%d\n", temp->var.value.i_value);
+          }
+          if (strcmp(temp->var.value.value_type, "float") == 0)
+          {
+              fprintf(symbol,"%f\n", temp->var.value.f_value);
+          }
+          if (strcmp(temp->var.value.value_type, "string") == 0 || strcmp(temp->var.value.value_type, "char") == 0)
+          {
+              fprintf(symbol,"\"%s\"\n", temp->var.value.string_value);
+          }
+          if (strcmp(temp->var.value.value_type, "bool") == 0)
+          {
+          if (temp->var.value.b_value == 0)
+              fprintf(symbol,"False\n");
+          else
+              fprintf(symbol,"True\n");
+          }
+        }
+        temp = temp->next;
+    }
+    
+  }
+  i=0;
+  for(;i<class_index;i++)
+  {
+    fprintf(symbol,"\n:::: %s CLASS VARIABLES ::::\n",temp_class[i].class_name);
+    for(int j=0;j<temp_class[i].nr_var;j++)
+    {
+      if(temp_class[i].constant[j])
+        fprintf(symbol," <%s> const %s\n",temp_class[i].class_name,temp_class[i].type[j],temp_class[i].names[j]);
+      else {
+        fprintf(symbol," <%s> %s %s\n",temp_class[i].class_name,temp_class[i].type[j],temp_class[i].names[j]);
       }
     }
   }

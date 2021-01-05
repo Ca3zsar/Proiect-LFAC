@@ -28,6 +28,14 @@ typedef struct stk{
     struct stk *next;
 } stackType;
 
+typedef struct{
+    char *class_name;
+    int nr_var;
+    int constant[100];
+    char *type[100];
+    char *names[100];
+}classType;
+
 typedef enum { constType, idType, operType, funcType,declarType} nodeTypes;
 
 /* constant values */
@@ -83,7 +91,10 @@ typedef struct nodeTypeTag {
 
 nodeType *dec_functions[100];
 nodeType *fct_to_run[100];
+nodeType *declarations[100];
+int dec_index=0;
 int func_index=0;
+int class_index=0;
 
 char *par_types[100];
 char *par[100];
@@ -94,4 +105,5 @@ int temp_arr[100];
 int temp_index;
 
 struct variables temp_var[100];
+classType temp_class[100];
 #endif
