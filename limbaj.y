@@ -3,241 +3,29 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include "tree.h"
+#include "compiler.h"
+#include "interpretor.h"
 
 int yylex();
-void yyerror(const char *s);
 
-extern FILE* yyin;
-extern char* yytext;
-extern int yylineno;
+nodeType *opr(int operation,int number, ...);
+nodeType *id(char *name);
+nodeType *constant(valueType value,char *type);
+nodeType *func(char *name,char *type,...);
+nodeType *dec(char *type,char **names,int constant,int array);
+nodeType *function(char *type,char *name,int inClass);
 
-typedef union{
-    int int_value;
-    float float_value;
-    int *int_array;
-    float *float_array;
-    char *content;
-  } value_t;
-
-struct variables
-{
-  char *type;
-  char *name;
-  int constant;
-  int initialised;
-  value_t value;
-  struct variables *next;
-};
-
-struct variables *var_head = NULL;
-struct variables *var_current;
-struct variables *var_last = NULL;
-
-struct variables temp[100];
-int index_temp = 0;
-
-char *global_type;
-
-int exists_variable(char *name)
-{
-  var_current = var_head;
-  while(var_current!=NULL)
-  {
-    if(strcmp(name,var_current->name)==0)
-    {
-      return 1;
-    }
-    var_current = var_current->next;
-  }
-  return 0;
-}
-
-void assign_value(char* type,char *name,char *constant,value_t v,int initialised)
-{
-  if(var_head==NULL)
-  {
-    var_head = (struct variables *) malloc(sizeof(struct variables));
-
-     var_head->type = strdup(type);
-     var_head->name = strdup(name);
-     if(strcmp(constant,"yes")==0)var_head->constant=1;
-     else var_head->constant = 0;
-
-     if(initialised){
-        if(strcmp(type,"int")==0)
-        {
-          var_head->value.int_value=v.int_value;
-        }
-        if(strcmp(type,"float")==0)
-        {
-          var_head->value.float_value=v.float_value;
-        }
-        if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
-        {
-          var_head->value.content=strdup(v.content);
-        }
-     }
-     var_head->next = var_last;
-  }
-  else{
-    if(!exists_variable(name))
-    {
-      var_last = (struct variables *) malloc(sizeof(struct variables));
-
-      var_last->type = strdup(type); 
-      var_last->name = strdup(name);
-
-      if(strcmp(constant,"yes")==0)var_last->constant=1;
-      else var_last->constant = 0;
-
-      if(initialised){
-        if(strcmp(type,"int")==0)
-        {
-          var_last->value.int_value=v.int_value;
-        }
-        if(strcmp(type,"float")==0)
-        {
-          var_last->value.float_value=v.float_value;
-        }
-        if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
-        {
-          var_last->value.content=strdup(v.content);
-        }
-      }
-      //var_last = var_last->next;
-      struct variables *var_current_temp;
-      var_current_temp = var_head;
-
-      while(var_current_temp->next != NULL){
-        var_current_temp = var_current_temp->next;
-      }
-      
-      var_current_temp -> next = var_last;
-      var_current_temp -> next -> next = NULL;
-      return;
-    }
-    yyerror("already defined variable");
-   }
-}
-
-void add_to_temp(char *type,char* name,value_t value,int initialised)
-{
-  temp[index_temp].type = strdup(type);
-  temp[index_temp].name = strdup(name);
-
-  if(initialised){
-    if(strcmp(type,"int")==0)
-    {
-      temp[index_temp].value.int_value = value.int_value;
-    }
-    if(strcmp(type,"float")==0)
-    {
-      temp[index_temp].value.float_value = value.float_value;
-    }
-    if(strcmp(type,"string")==0 || strcmp(type,"char")==0)
-    {
-      temp[index_temp].value.content = strdup(value.content);
-    }
-  }
-  temp[index_temp].initialised = initialised;
-  index_temp ++;
-}
-
-void add_to_linked(char* is_const,char *type)
-{
-  for(int i=0;i<index_temp;i++)
-  {
-    if(!temp[i].type[0] == ' ' && strcmp(temp[i].type,type))
-    {
-      yyerror("Incompatible types!");
-    }
-
-    assign_value(type,temp[i].name,is_const,temp[i].value,temp[i].initialised);
-    temp[i].initialised=0;
-
-  }
-  index_temp = 0;
-}
-
-void modify_linked()
-{
-  for(int i=0;i<index_temp;i++)
-  {
-    int found = 0;
-    var_current = var_head;
-    while(var_current!=NULL)
-    {
-      if(strcmp(temp[i].name,var_current->name)==0)
-      {
-        if(strcmp(var_current->type,temp[i].type))
-        {
-          yyerror("incompatible types!");
-        }
-
-        if(var_current->constant==1)
-        {
-          yyerror("cannot modify const");
-        }
-
-        if(strcmp(var_current->type,"int")==0)
-        {
-          var_current->value.int_value = temp[i].value.int_value;
-        }
-        if(strcmp(var_current->type,"float")==0){
-          var_current->value.float_value = temp[i].value.float_value;
-        }
-        if(strcmp(var_current->type,"char")==0 || strcmp(var_current->type,"string")==0)
-        {
-          var_current->value.content = strdup(temp[i].value.content);
-        }
-
-        var_current->initialised = 1;
-        
-        found = 1;
-        break;
-      }
-      var_current = var_current->next;
-    }
-    if(!found)
-    {
-      yyerror("variable not declared!");
-    }
-  }
-  index_temp = 0;
-}
-
-struct number get_value(char *name){
-  struct number num = {0,0,0,0};
-  int a=0;
-  
-  var_current = var_head;
-  while(var_current!=NULL)
-  {
-    a++;
-    if(strcmp(var_current->name,name)==0)
-    {
-      if(strcmp(var_current->type,"float")==0)
-      {
-        num.is_rational=1;
-        num.rational=var_current->value.float_value;
-      }else{
-        num.is_rational=0;
-        num.integer =var_current->value.int_value;
-      }
-      return num;
-    }
-    var_current = var_current->next;
-  }
-  yyerror("variabile not declared");
-
-}
-
+int exists_function(char *return_type,char *name,int inClass);
+void assign_class(char *class_n);
+void freeNode(nodeType *p);
 %}
 
 %union {
   struct number num;
-  int bool_val;
   char *string;
+  struct nodeTypeTag *nodePointer;
 };
 
 %start program
@@ -245,160 +33,443 @@ struct number get_value(char *name){
 %token <string>TYPE
 %token <string>CHAR 
 %token <string>TEXT
-%token <string>ARRAY
 %token <string>CLASS
 %token <num>INT_NUM
 %token <num> FLOAT_NUM
-%token <bool_val>BOOL_VAL
+%token <string>BOOL_VAL
 %token <string>IF
 %token <string>ELSE
 %token <string>FOR
 %token <string>WHILE
-%token <string>SWITCH
-%token <string>GT
-%token <string>GE
-%token <string>LT
-%token <string>LE
-%token <string>EQ
+%token <string>GT GE LT LE NE EQ
 %token <string>AND
 %token <string>OR
 %token <string>ASSIGN
 %token <string>FUNCTION
 %token <string> CONST
 %token <string> NOT
+%token <string> RETURN
+%token <string> EVAL
+%token PRINT
 
-%type <num> expr
-%type instructiune
+%type <nodePointer> expr
+%type <nodePointer> assignation
+%type <nodePointer> instruction
+%type <nodePointer> conditions
+%type <nodePointer> while_check if_check for_check
+%type <nodePointer> statements interior_statements function_instr class_instr
+%type <nodePointer> global function
+%type <nodePointer> declaration
 
 %left OR 
 %left AND
 %left NOT
-%left GT GE LT LE EQ 
+%left GT GE LT LE EQ NE
 %left '+' '-'
 %left '*' '/' '%'
 %left '(' ')'
-%%
-program : blocuri {printf("program corect\n");}
-        ;
 
-blocuri : declaratie ';' blocuri
-        | instructiune ';' blocuri
-        | asignari ';' blocuri
+%nonassoc IFX
+%nonassoc ELSE
+
+%%
+program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;compile(temp,-1);interpret($2,-1);}
+        | program function {compile($2,0);interpret($2,0);freeNode($2);}
         | /* empty */
         ;
 
-declaratie : TYPE identificator {add_to_linked("no",$1);}
-	         | TYPE ID '(' parameter_list ')' '{' blocuri '}'
-           | CONST TYPE identificator {add_to_linked("yes",$2);}
-           | CLASS ID '{' class_dec '}'
-           | ID ID 
+global :  statements {$$ = $1;}
+       ;
+
+statements :declaration ';'  {$$ = $1;}
+           | instruction ';'  {$$ = $1;}
+           | assignation ';' {$$ = $1;}
+           | if_check {$$ = $1;}
+           | while_check {$$ = $1;}
+           | for_check {$$ = $1;}
+           | PRINT expr ';' {$$ = opr(PRINT,1,$2);}
+           | PRINT TEXT ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"string"));}
+           | PRINT CHAR ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"char"));}
+           | RETURN expr ';'
            ;
 
-class_dec : declaratie ';' class_dec
-          | declaratie ';'
-          |  ID '(' parameter_list ')' '{' blocuri '}'
+
+interior_statements : statements { $$ = $1;}
+                    | interior_statements statements {$$ = opr(';',2,$1,$2);}
+                    ;
+
+function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
+                                           opr('f',2,dec_functions[func_index]=function($1,$2,0),$7);func_index++;}
+         ;
+
+function_instr : statements {$$ = $1;}
+               | function_instr statements {$$ = opr(';',2,$1,$2);}
+               ;
+
+declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
+           | CONST TYPE identifier {$$=dec($2,temp_ids,1,0);}
+           | CLASS ID '{' class_dec '}' {assign_class($2);}
+           | ID ID '(' arguments  ')'
+           ;
+
+identifier : /* identifier ',' assignation */ 
+             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=0;temp_index++;}
+            | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);temp_arr[temp_index]=$5.integer;temp_index++;}
+            | /* assignation */
+            | ID  {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=0;temp_index++;}
+            | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=$3.integer;temp_index++;}
+            ;
+
+class_dec : declaration ';' class_dec
+          | declaration ';'
+          | class_function  class_dec
+          | class_function 
           ;
 
-parameter_list : parameter
-                | parameter_list ',' parameter
+class_function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
+                                           opr('f',2,dec_functions[func_index]=function($1,$2,1),$7);func_index++;}
+               | ID '(' parameter_list ')' '{' class_instr'}' {fct_to_run[func_index] = 
+                                                          opr('f',2,dec_functions[func_index]=function("constructor",$1,1),$6);func_index++;}
+               ;
+
+class_instr : class_instr declaration ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr instruction ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr assignation ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr PRINT expr ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
+            | class_instr PRINT TEXT ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
+            | class_instr PRINT CHAR ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
+            | /* empty */
+
+parameter_list : TYPE ID {par_types[par_index]=strdup($1);par[par_index]=strdup($2);par_index++;}
+                | parameter_list ',' TYPE ID {par_types[par_index]=strdup($3);par[par_index]=strdup($4);par_index++;}
+                | /* empty */
                 ;
-		   
-parameter : TYPE ID
-	    | /* empty */
-	    ;
 
-identificator : identificator ',' asignare 
-              | identificator ',' ID {value_t v;add_to_temp(" ",$3,v,0);}
-              | identificator ',' ARRAY 
-              | asignare 
-              | ID  {value_t v;add_to_temp(" ",$1,v,0);}
-              | ARRAY
-              ;
+assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
+            | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
+            | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
+            | ID '[' INT_NUM ']' ASSIGN expr
+            | ID '[' INT_NUM ']' ASSIGN CHAR
+            | ID '[' INT_NUM ']' ASSIGN TEXT
+            ;
 
-asignari : asignare {modify_linked();} 
-         ;
-
-asignare : ID ASSIGN expr {if($3.is_rational){value_t v;v.float_value=$3.rational;add_to_temp("float",$1,v,1);}
-                                            else{value_t v;v.int_value=$3.integer;add_to_temp("int",$1,v,1);}}
-
-         | ID ASSIGN CHAR {value_t v;v.content = strdup($3);add_to_temp("char",$1,v,1);}
-         | ID ASSIGN TEXT {value_t v;v.content = strdup($3);add_to_temp("string",$1,v,1);}
-         ;
-
-instructiune : expr {($1.is_rational)?printf("instr->expr : valoare : %f \n\n",$1.rational):
-                                             printf("instr->expr : valoare : %d \n\n",$1.integer);}
-             | apel_functie
+instruction :  function_call
+             | EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
+             | expr {$$ = $1;}
              | ID '.' ID
-             | ID '.' apel_functie
-             | if_check 
+             | ID '.' ID '(' arguments ')'
              ;
 
-apel_functie : ID '(' argumente ')'
+function_call : ID '(' arguments ')' {}
              ;
              
-argumente : argumente ',' expr
-          | argumente ',' apel_functie
+arguments : arguments ',' expr
+          | arguments ',' function_call
+          | arguments ',' TEXT
+          | arguments ',' CHAR
+          | CHAR
+          | TEXT
           | expr
-          | apel_functie
+          | function_call
           | /* empty */
           ;
 
-if_check : IF '(' conditii ')' '{' blocuri'}'
+if_check : IF '(' conditions ')' '{' interior_statements '}'
+                                    {$$ = opr(IF,2,$3,$6);}
+         | IF '(' conditions ')' '{' interior_statements '}' ELSE '{' interior_statements '}'
+                                    {$$ = opr(IF,3,$3,$6,$10);}
          ;
 
-while_check : WHILE '(' conditii ')' '{' blocuri '}'
+while_check : WHILE '(' conditions ')' '{' interior_statements '}' 
+                                    {$$ = opr(WHILE,2,$3,$6);}
+            ;
 
-conditii : conditii AND conditii 
-         | conditii OR conditii 
-         | NOT conditii
-         | '(' conditii ')'
-         | conditie
-         ;
+for_check : FOR '(' expr ':' expr ')' '{' interior_statements '}'
+                                    {$$ = opr(FOR,3,$3,$5,$8);}
 
-conditie : expr EQ expr
-         | expr GT expr
-         | expr GE expr
-         | expr LT expr
-         | expr LE expr
-         | expr
-         ;
 
-expr : expr '+' expr {$$=addition($1,$3); printf("expr->expr+expr\n");}
-     | expr '-' expr {$$=substraction($1,$3); printf("expr->expr-expr\n");}
-     | expr '*' expr {$$=multiply($1,$3); printf("expr->expr*expr\n");}
-     | expr '/' expr {$$=division($1,$3); printf("expr->expr/expr\n");}
-     | expr '%' expr {$$=modulo($1,$3);if($$.modulo_error)yyerror("Modulo se poate doar pe intregi"); 
-                        printf("expr->expr%%expr\n");}
-     | '(' expr ')' {$$ = $2; printf("expr->(expr)\n");}
-     | '-' expr {$$=negate($2);printf("expr-> -expr\n");}
-     | INT_NUM {$$=$1; printf("expr->%d\n",$1);}
-     | FLOAT_NUM {$$=$1;printf("expr->%f\n",$1.rational);}
-     | ID {$$=get_value($1);printf("expr->%s\n",$1);}
+conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);}
+           | conditions OR conditions  {$$ = opr(OR,2,$1,$3);}
+           | '(' conditions AND conditions ')' {$$ = opr(AND,2,$2,$4);}
+           | '(' conditions OR conditions ')'{$$ = opr(OR,2,$2,$4);}
+           | NOT conditions {$$ = opr(NOT,1,$2);}
+           | expr {$$ = $1;}
+           ;
+
+expr : ID {$$=id($1);}
+     | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int");}
+     | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");}
+     | BOOL_VAL {valueType v;
+                if(strcmp($1,"True")==0)
+                  v.b_value = 1;
+                else v.b_value=0;
+                v.value_type=strdup("bool");
+                $$=constant(v,"bool");
+                }
+     | ID '[' INT_NUM ']'
+     | expr '+' expr {$$=opr('+',2,$1,$3);}
+     | expr '-' expr {$$=opr('-',2,$1,$3);}
+     | expr '*' expr {$$=opr('*',2,$1,$3);}
+     | expr '/' expr {$$=opr('/',2,$1,$3);}
+     | expr '%' expr {$$=opr('%',2,$1,$3);}
+     | '(' expr ')' {$$ = $2;}
+     | '-' expr{$$=opr('-',1,$2);}
+     | expr EQ expr {$$=opr(EQ,2,$1,$3);} 
+     | expr NE expr {$$=opr(NE,2,$1,$3);}
+     | expr GT expr {$$=opr(GT,2,$1,$3);}
+     | expr GE expr {$$=opr(GE,2,$1,$3);}
+     | expr LT expr {$$=opr(LT,2,$1,$3);}
+     | expr LE expr {$$=opr(LE,2,$1,$3);}
      ;
 %%
-void yyerror(const char * s){
-  printf("eroare: %s la linia:%d\n",s,yylineno);
-  exit(0);
-}
 
-void print_table()
+
+nodeType *constant(valueType value,char* type)
 {
-  char* filename = "symbol_table.txt";
-  FILE *symbol = fopen(filename,"w");
-  fprintf(symbol,"---The declared variables are: ---\n");
-  var_current = var_head;
+  nodeType *p;
 
-  while(var_current != NULL)
+  // allocate node
+  if ((p = malloc(sizeof(constNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  // copy info
+  p->type = constType;
+  p->con.value.value_type= strdup(type);
+  if(strcmp(type,"char")==0 || strcmp(type,"string")==0)
   {
-    var_current=var_current->next;
+    p->con.value.string_value = strdup(value.string_value);
+  }
+  if(strcmp(type,"int")==0)
+  {
+    p->con.value.i_value = value.i_value;
+  }
+  if(strcmp(type,"float")==0)
+  {
+    p->con.value.f_value = value.f_value;
+  }
+  if(strcmp(type,"bool")==0)
+  {
+    p->con.value.b_value = value.b_value;
   }
 
+  return p;
+}
+
+nodeType *id(char *name)
+{
+  nodeType *p;
+  // allocate node
+  if ((p = malloc(sizeof(idNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = idType;
+  p->id.name = strdup(name);
+
+  return p;
+}
+
+nodeType *dec(char *type,char **name,int constant,int array)
+{
+  nodeType *p;
+
+  // allocate node
+  if ((p = (nodeType*)malloc(sizeof(declarNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = declarType;
+  for(int i=0;i<temp_index;i++)
+  {
+    p->dec.names[i] = strdup(temp_ids[i]);
+  }
+  p->dec.pred_type = strdup(type);
+  p->dec.constant = constant;
+  p->dec.arr_size = array;
+  p->dec.nr_declared = temp_index;
+
+  temp_index=0;
+
+  return p;
+}
+
+nodeType *opr(int operation,int number, ...)
+{
+  va_list ap;
+  nodeType *p;
+  size_t size;
+  int i;
+
+  size = sizeof(operationNode) + (number ) * sizeof(nodeType*);
+  if ((p = malloc(sizeof(constNode))) == NULL)
+    yyerror("cannot allocate node");
+
+  // copy info
+  p->type = operType;
+  p->opr.operation = operation;
+  p->opr.operNumber = number;
+  va_start(ap,number);
+
+  for(i=0;i<number;i++)
+  {
+    p->opr.operands[i] = malloc(sizeof(nodeType));
+    p->opr.operands[i] = va_arg(ap,nodeType*);
+  }
+  va_end(ap);
+  return p;
+}
+
+nodeType *function(char *type,char *name,int inClass)
+{
+  nodeType *p;
+  size_t size;
+
+  if(exists_function(type,name,inClass))
+    yyerror("cannot declare function with identical signature in the same scope");
+
+  size = sizeof(functionNode);
+  if((p = malloc(sizeof(size))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = funcType;
+  p->fct.name = strdup(name);
+  p->fct.par_number = par_index;
+  p->fct.return_type = strdup(type);
+  p->fct.class_name = NULL;
+  p->fct.in_class = inClass;
+
+  for(int i = 0; i<par_index;i++)
+  {
+    p->fct.par_names[i]=strdup(par[i]);
+    p->fct.par_types[i]=strdup(par_types[i]);
+  }
+
+  par_index=0;
+
+  return p;
+}
+
+int exists_function(char *return_type,char *name,int inClass)
+{
+  for(int i=0;i<func_index;i++)
+  {
+    if(dec_functions[i]->fct.in_class == inClass)
+    {
+      if(inClass != 0)
+      {
+        if(dec_functions[i]->fct.class_name == NULL)
+        {
+          if(strcmp(name,dec_functions[i]->fct.name)==0){
+            if(strcmp(return_type,dec_functions[i]->fct.return_type))
+              yyerror("cannot declare 2 functions with same name and different return types");
+
+            if(par_index == dec_functions[i]->fct.par_number)
+            {
+              int ok=0;
+              for(int j=0;j<par_index;j++)
+              {
+                
+                if(strcmp(par_types[j],dec_functions[i]->fct.par_types[j]))
+                  ok = 1;
+                
+                if(ok)break;
+              }
+              if(!ok)
+                return 1;
+            }
+          }
+
+        }
+      }else{
+        if(strcmp(name,dec_functions[i]->fct.name)==0){
+            if(strcmp(return_type,dec_functions[i]->fct.return_type))
+              yyerror("cannot declare 2 functions with same name and different return types");
+
+            if(par_index == dec_functions[i]->fct.par_number)
+            {
+              int ok=0;
+              for(int j=0;j<par_index;j++)
+              {
+                
+                if(strcmp(par_types[j],dec_functions[i]->fct.par_types[j]))
+                  ok = 1;
+                
+                if(ok)break;
+              }
+              if(!ok)
+                return 1;
+            }
+          }
+      }
+    }
+  }
+  return 0;
+}
+
+void assign_class(char *class_n)
+{
+  for(int i=0;i<func_index;i++)
+  {
+    if(dec_functions[i]->fct.in_class)
+    {
+      if(dec_functions[i]->fct.class_name == NULL)
+      {
+        dec_functions[i]->fct.class_name = strdup(class_n);
+      }
+    }
+  }
+}
+
+void freeNode(nodeType *p)
+{
+  int i;
+  if(!p)return;
+  if(p->type == operType)
+  {
+    for(i=0;i<p->opr.operNumber;i++)
+    {
+      freeNode(p->opr.operands[i]);
+    }
+  }
+  free(p);
+}
+
+void create_table()
+{
+  FILE *symbol = fopen("symbol_table.txt","w");
+  // Print the functions.
+  fprintf(symbol,":::: FUNCTIONS ::::\n");
+  for(int i=0;i<func_index;i++)
+    {
+      fprintf(symbol,"%s ",dec_functions[i]->fct.return_type);
+      fprintf(symbol,"%s ",dec_functions[i]->fct.name);
+      
+      fprintf(symbol,"( ");
+      for(int j=0;j<dec_functions[i]->fct.par_number;j++)
+      {
+        fprintf(symbol,"%s %s, ",dec_functions[i]->fct.par_types[j],dec_functions[i]->fct.par_names[j]);
+      }
+      fprintf(symbol," )");
+
+      if(dec_functions[i]->fct.in_class)
+      {
+        fprintf(symbol," :: class %s\n",dec_functions[i]->fct.class_name);
+      }else{
+        fprintf(symbol," :: global\n");
+      }
+      fprintf(symbol,"----------\n");
+    }
+  fprintf(symbol,"\n:::: GLOBAL VARIABLES ::::\n");
+  stackType *temp = (stackType*)malloc(sizeof(stackType));
+  
 }
 
 int main(void)
 {
     yyin = fopen("program.txt","r");
+    symbol = fopen("symbol_table.txt","w");
     yyparse();
-    print_table();
+    interpret(fct_to_run[0],0);
+    // create_table();
+    // printStack();
+    
     return 0;
 }

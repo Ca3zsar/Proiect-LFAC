@@ -13,10 +13,10 @@ digit [0-9]
 number ({digit_n}{digit}+)|{digit}
 float_number {number}"."{digit}+
 
-bool_val "True"|"False"
+bool_val True|False
 
 character \'.\'
-text \"[^\"]*\"
+text \"[^"\n]*["\n]
 
 identificator [_a-zA-Z][_0-9a-zA-Z]*
 
@@ -27,32 +27,35 @@ space [' ''\t']
 
 %option noyywrap
 %%
-"if" {printf("if token\n");return IF;}
+"if" {return IF;}
 "else" {return ELSE;}
 "for" {return FOR;}
 "while" {return WHILE;}
-"switch" {return SWITCH;}
+"print" {return PRINT;}
 
-"function" {return FUNCTION;}
+"=" {return ASSIGN;}
 
 ">" {return GT;}
 ">=" {return GE;}
 "<" {return LT;}
 "<=" {return LE;}
 "==" {return EQ;}
+"!=" {return NE;}
 "!" {return NOT;}
 
 "&&" {return AND;}
 "||" {return OR;}
 
-"=" {return ASSIGN;}
-
 "const" {return CONST;}
+"return" {return RETURN;}
 {type} {yylval.string = strdup(yytext);
                          return TYPE;}
 
 "class" {yylval.string = strdup(yytext);
         return CLASS;}
+
+"eval" {yylval.string = strdup(yytext);
+        return EVAL;}
 
 {number} {yylval.num = (struct number){atoi(yytext),0,0};
          return INT_NUM;}
@@ -60,11 +63,22 @@ space [' ''\t']
 {float_number} {yylval.num = (struct number){0,atof(yytext),1};
                 return FLOAT_NUM;}
 
-{character} {yylval.string = strdup(yytext);
+{character} {yylval.string = strdup(yytext+1);
+            if(yylval.string[yyleng-2] != '\''){
+                printf("improperly terminated string");
+                exit(0);
+            }else
+                yylval.string[yyleng-2] = 0;
             return CHAR;}
 
-{text} {yylval.string = strdup(yytext);
-                        return TEXT;}
+
+{text} {yylval.string = strdup(yytext+1);
+        if(yylval.string[yyleng-2] != '"'){
+            printf("improperly terminated string");
+            exit(0);
+        }else
+            yylval.string[yyleng-2] = 0;
+        return TEXT;}
 
 {bool_val} { yylval.string = strdup(yytext);
             return BOOL_VAL;}
@@ -72,8 +86,6 @@ space [' ''\t']
 {identificator} {yylval.string = strdup(yytext);
                 return ID;}
 
-{identificator}\[{number}\] {yylval.string = strdup(yytext);
-                            return ARRAY;}
 {operator} {return yytext[0];}
 
 
