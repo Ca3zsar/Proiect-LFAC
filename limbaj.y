@@ -53,7 +53,7 @@ void freeNode(nodeType *p);
 %token PRINT
 
 %type <nodePointer> expr
-%type <nodePointer> assignation
+%type <nodePointer> assignement
 %type <nodePointer> instruction
 %type <nodePointer> conditions
 %type <nodePointer> while_check if_check for_check
@@ -73,8 +73,8 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;compile(temp,-1);interpret($2,-1);}
-        | program function {compile($2,0);interpret($2,0);freeNode($2);}
+program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;interpret($2,-1);}
+        | program function 
         | /* empty */
         ;
 
@@ -83,14 +83,14 @@ global :  statements {$$ = $1;}
 
 statements :declaration ';'  {$$ = $1;}
            | instruction ';'  {$$ = $1;}
-           | assignation ';' {$$ = $1;}
+           | assignement ';' {$$ = $1;}
            | if_check {$$ = $1;}
            | while_check {$$ = $1;}
            | for_check {$$ = $1;}
            | PRINT expr ';' {$$ = opr(PRINT,1,$2);}
            | PRINT TEXT ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"string"));}
            | PRINT CHAR ';' {valueType v; v.string_value=strdup($2);$$ = opr(PRINT,1,constant(v,"char"));}
-           | RETURN expr ';'
+           | RETURN expr ';' {$$ = opr(RETURN,1,$2);}
            ;
 
 
@@ -112,7 +112,7 @@ declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
            | ID ID '(' arguments  ')'
            ;
 
-identifier : /* identifier ',' assignation */ 
+identifier : /* identifier ',' assignement */ 
              identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=0;temp_index++;}
             | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);temp_arr[temp_index]=$5.integer;temp_index++;}
             | /* assignation */
@@ -134,18 +134,18 @@ class_function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_r
 
 class_instr : class_instr declaration ';' {$$ = opr(';',2,$1,$2);}
             | class_instr instruction ';' {$$ = opr(';',2,$1,$2);}
-            | class_instr assignation ';' {$$ = opr(';',2,$1,$2);}
+            | class_instr assignement ';' {$$ = opr(';',2,$1,$2);}
             | class_instr PRINT expr ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
             | class_instr PRINT TEXT ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
             | class_instr PRINT CHAR ';' {$$ = opr(';',2,$1,opr(PRINT,1,$3));}
-            | /* empty */
+            | /* empty */ {}
 
 parameter_list : TYPE ID {par_types[par_index]=strdup($1);par[par_index]=strdup($2);par_index++;}
                 | parameter_list ',' TYPE ID {par_types[par_index]=strdup($3);par[par_index]=strdup($4);par_index++;}
                 | /* empty */
                 ;
 
-assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
+assignement : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
             | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
             | ID '[' INT_NUM ']' ASSIGN expr
@@ -160,7 +160,9 @@ instruction :  function_call
              | ID '.' ID '(' arguments ')'
              ;
 
-function_call : ID '(' arguments ')' {}
+function_call : ID '(' arguments ')' {
+
+                                      }
              ;
              
 arguments : arguments ',' expr
@@ -447,6 +449,8 @@ void create_table()
       {
         fprintf(symbol,"%s %s, ",dec_functions[i]->fct.par_types[j],dec_functions[i]->fct.par_names[j]);
       }
+      if(dec_functions[i]->fct.par_number)
+        fseek(symbol,-2,SEEK_END);
       fprintf(symbol," )");
 
       if(dec_functions[i]->fct.in_class)
@@ -457,9 +461,43 @@ void create_table()
       }
       fprintf(symbol,"----------\n");
     }
+
   fprintf(symbol,"\n:::: GLOBAL VARIABLES ::::\n");
+
   stackType *temp = (stackType*)malloc(sizeof(stackType));
-  
+  if(global_head!=NULL){
+    temp=global_head;
+    while(temp!=NULL)
+    {
+      fprintf(symbol," <global> %s %s = ",temp->var.value.value_type,temp->var.name);
+
+      if(temp->var.constant)
+        fprintf(symbol," <global> const %s %s = ",temp->var.value.value_type,temp->var.name);
+      else {
+        fprintf(symbol," <global> %s %s = ",temp->var.value.value_type,temp->var.name);
+      }
+      if (strcmp(temp->var.value.value_type, "int") == 0)
+      {
+          fprintf(symbol,"%d\n", temp->var.value.i_value);
+      }
+      if (strcmp(temp->var.value.value_type, "float") == 0)
+      {
+          fprintf(symbol,"%f\n", temp->var.value.f_value);
+      }
+      if (strcmp(temp->var.value.value_type, "string") == 0 || strcmp(temp->var.value.value_type, "char") == 0)
+      {
+          fprintf(symbol,"%s\n", temp->var.value.string_value);
+      }
+      if (strcmp(temp->var.value.value_type, "bool") == 0)
+      {
+          if (temp->var.value.b_value == 0)
+              fprintf(symbol,"False\n");
+          else
+              fprintf(symbol,"True\n");
+      }
+      temp=temp->next;
+    }
+  }
 }
 
 int main(void)
@@ -467,8 +505,8 @@ int main(void)
     yyin = fopen("program.txt","r");
     symbol = fopen("symbol_table.txt","w");
     yyparse();
-    interpret(fct_to_run[0],0);
-    // create_table();
+    // interpret(fct_to_run[0],0);
+    create_table();
     // printStack();
     
     return 0;

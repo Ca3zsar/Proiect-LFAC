@@ -303,8 +303,6 @@ valueType interpret(nodeType *root, int is_global)
     valueType v, v2, vcompare;
     stackType *last, *ante_last;
 
-    // printStack();
-
     v.initialised = 0;
 
     if (!root)
@@ -343,6 +341,7 @@ valueType interpret(nodeType *root, int is_global)
             {
                 ante_last->next = NULL;
             }
+            break;
         case WHILE:
             while (interpret(root->opr.operands[0], is_global).is_true)
             {
