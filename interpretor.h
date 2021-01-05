@@ -16,8 +16,6 @@ stackType *global_last = NULL;
 
 stackType *var_stack = NULL;
 
-void printStack();
-
 stackType *exists_variable(char *name, int is_global)
 {
 
@@ -53,28 +51,8 @@ void declare_variable(declarNode node, int is_global)
             global_head = (stackType *)malloc(sizeof(stackType));
             global_head->next = NULL;
             global_head->var.value.value_type = strdup(node.pred_type);
-            global_head->var.name = strdup(node.inf[0].name);
+            global_head->var.name = strdup(node.names[0]);
             global_head->tip = 1;
-            global_head->var.array_size = node.inf[0].arr_size;
-
-            if(node.inf[0].arr_size>0)
-            {
-                if(strcmp(node.pred_type,"int")==0)
-                {
-                    global_head->var.value.i_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
-                }
-                if(strcmp(node.pred_type,"float")==0)
-                {
-                    global_head->var.value.f_array = (float*)calloc(node.inf[0].arr_size,sizeof(float));
-                }
-                if(strcmp(node.pred_type,"bool")==0)
-                {
-                    global_head->var.value.b_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
-                }
-                if(strcmp(node.pred_type,"string")==0 || strcmp(node.pred_type,"char")==0)
-                    yyerror("cannot create array of this type");
-            }
-
             if (node.constant)
                 global_head->var.constant = 1;
             else
@@ -89,28 +67,8 @@ void declare_variable(declarNode node, int is_global)
             var_stack = (stackType *)malloc(sizeof(stackType));
             var_stack->next = NULL;
             var_stack->var.value.value_type = strdup(node.pred_type);
-            var_stack->var.name = strdup(node.inf[0].name);
-            var_stack->tip = 1;
-            var_stack->var.array_size = node.inf[0].arr_size;
-
-            if(node.inf[0].arr_size>0)
-            {
-                if(strcmp(node.pred_type,"int")==0)
-                {
-                    var_stack->var.value.i_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
-                }
-                if(strcmp(node.pred_type,"float")==0)
-                {
-                    var_stack->var.value.f_array = (float*)calloc(node.inf[0].arr_size,sizeof(float));
-                }
-                if(strcmp(node.pred_type,"bool")==0)
-                {
-                    var_stack->var.value.b_array = (int*)calloc(node.inf[0].arr_size,sizeof(int));
-                }
-                if(strcmp(node.pred_type,"string")==0 || strcmp(node.pred_type,"char")==0)
-                    yyerror("cannot create array of this type");
-            }
-
+            var_stack->var.name = strdup(node.names[0]);
+            global_head->tip = 1;
             if (node.constant)
                 var_stack->var.constant = 1;
             else
@@ -131,32 +89,13 @@ void declare_variable(declarNode node, int is_global)
 
     for (; i < node.nr_declared; i++)
     {
-        if (exists_variable(node.inf[i].name, is_global))
+        if (exists_variable(node.names[i], is_global))
             yyerror("variable already defined in current scope!");
 
         stackType *last_stack = (stackType *)malloc(sizeof(stackType));
 
         last_stack->var.value.value_type = strdup(node.pred_type);
-        last_stack->var.name = strdup(node.inf[i].name);
-        last_stack->var.array_size = node.inf[i].arr_size;
-
-        if(node.inf[0].arr_size>0)
-        {
-            if(strcmp(node.pred_type,"int")==0)
-            {
-                global_head->var.value.i_array = (int*)calloc(node.inf[i].arr_size,sizeof(int));
-            }
-            if(strcmp(node.pred_type,"float")==0)
-            {
-                global_head->var.value.f_array = (float*)calloc(node.inf[i].arr_size,sizeof(float));
-            }
-            if(strcmp(node.pred_type,"bool")==0)
-            {
-                global_head->var.value.b_array = (int*)calloc(node.inf[i].arr_size,sizeof(int));
-            }
-            if(strcmp(node.pred_type,"string")==0 || strcmp(node.pred_type,"char")==0)
-                yyerror("cannot create array of this type");
-        }
+        last_stack->var.name = strdup(node.names[i]);
 
         if (node.constant)
             last_stack->var.constant = 1;
@@ -176,11 +115,12 @@ void declare_variable(declarNode node, int is_global)
         temp->next = last_stack;
         temp->next->next = NULL;
     }
-    printStack();
 }
 
-void assign_variable(char *var_name, valueType val, int is_global,int pos)
+void assign_variable(idNode node, valueType val, int is_global)
 {
+
+    char *var_name = strdup(node.name);
     stackType *found = (stackType *)malloc(sizeof(stackType));
 
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
@@ -196,58 +136,31 @@ void assign_variable(char *var_name, valueType val, int is_global,int pos)
     if (!(found = exists_variable(var_name, is_global)))
         yyerror("variable not declared!");
 
-    //////
-    if(pos >= 0 && found->var.array_size==-1)
-        yyerror("operation permitted only on arrays");
-    
-    if(pos <= -1 && found->var.array_size>0)
-        yyerror("operation not permitted on arrays");
-
-    if(pos>=0 && found->var.array_size >0 && pos>=found->var.array_size)
-        yyerror("index out of range");
-    ///////
-
     if (found->var.constant == 1)
         yyerror("cannot modify const");
 
     if (strcmp(val.value_type, found->var.value.value_type))
         yyerror("wrong type used!");
 
-    if(pos==-1){
-        if (strcmp(val.value_type, "int") == 0)
-        {
-            found->var.value.i_value = val.i_value;
-        }
-        if (strcmp(val.value_type, "float") == 0)
-        {
-            found->var.value.f_value = val.f_value;
-        }
-        if (strcmp(val.value_type, "bool") == 0)
-        {
-            found->var.value.b_value = val.b_value;
-        }
-        if (strcmp(val.value_type, "char") == 0 || strcmp(val.value_type, "string") == 0)
-        {
-            found->var.value.string_value = strdup(val.string_value);
-        }
-    }else{
-        if (strcmp(val.value_type, "int") == 0)
-        {
-            found->var.value.i_array[pos] = val.i_value;
-        }
-        if (strcmp(val.value_type, "float") == 0)
-        {
-            found->var.value.f_array[pos] = val.f_value;
-        }
-        if (strcmp(val.value_type, "bool") == 0)
-        {
-            found->var.value.b_array[pos] = val.b_value;
-        }
+    if (strcmp(val.value_type, "int") == 0)
+    {
+        found->var.value.i_value = val.i_value;
     }
-    printStack();
+    if (strcmp(val.value_type, "float") == 0)
+    {
+        found->var.value.f_value = val.f_value;
+    }
+    if (strcmp(val.value_type, "bool") == 0)
+    {
+        found->var.value.b_value = val.b_value;
+    }
+    if (strcmp(val.value_type, "char") == 0 || strcmp(val.value_type, "string") == 0)
+    {
+        found->var.value.string_value = strdup(val.string_value);
+    }
 }
 
-valueType get_value(char *name, int is_global,int pos)
+valueType get_value(char *name, int is_global)
 {
     int a = 0;
     stackType *found = (stackType *)malloc(sizeof(stackType));
@@ -265,46 +178,23 @@ valueType get_value(char *name, int is_global,int pos)
     if (!(found = exists_variable(name, is_global)))
         yyerror("variable not declared");
 
-    if(pos >= 0 && found->var.array_size==-1)
-        yyerror("operation permitted only on arrays");
-    
-    if(pos <= -1 && found->var.array_size>0)
-        yyerror("operation not permitted on arrays");
-
-    if(pos>=0 && found->var.array_size >0 && pos>=found->var.array_size)
-        yyerror("index out of range");
-
     valueType tempVal;
-    if(pos==-1){
-        if (strcmp(found->var.value.value_type, "float") == 0)
-        {
-            tempVal.f_value = found->var.value.f_value;
-        }
-        if (strcmp(found->var.value.value_type, "int") == 0)
-        {
-            tempVal.i_value = found->var.value.i_value;
-        }
-        if (strcmp(found->var.value.value_type, "bool") == 0)
-        {
-            tempVal.b_value = found->var.value.b_value;
-        }
-        if (strcmp(found->var.value.value_type, "string") == 0 || strcmp(found->var.value.value_type, "char") == 0)
-        {
-            tempVal.string_value = found->var.value.string_value;
-        }
-    }else{
-        if (strcmp(found->var.value.value_type, "float") == 0)
-        {
-            tempVal.f_value = found->var.value.f_array[pos];
-        }
-        if (strcmp(found->var.value.value_type, "int") == 0)
-        {
-            tempVal.i_value = found->var.value.i_array[pos];
-        }
-        if (strcmp(found->var.value.value_type, "bool") == 0)
-        {
-            tempVal.b_value = found->var.value.b_array[pos];
-        }
+
+    if (strcmp(found->var.value.value_type, "float") == 0)
+    {
+        tempVal.f_value = found->var.value.f_value;
+    }
+    if (strcmp(found->var.value.value_type, "int") == 0)
+    {
+        tempVal.i_value = found->var.value.i_value;
+    }
+    if (strcmp(found->var.value.value_type, "bool") == 0)
+    {
+        tempVal.b_value = found->var.value.b_value;
+    }
+    if (strcmp(found->var.value.value_type, "string") == 0 || strcmp(found->var.value.value_type, "char") == 0)
+    {
+        tempVal.string_value = found->var.value.string_value;
     }
     tempVal.value_type = strdup(found->var.value.value_type);
 
@@ -409,6 +299,8 @@ valueType interpret(nodeType *root, int is_global)
 
     // printStack();
 
+    v.initialised = 0;
+
     if (!root)
     {
         return v;
@@ -418,9 +310,7 @@ valueType interpret(nodeType *root, int is_global)
     case constType:
         return root->con.value;
     case idType:
-        return get_value(root->id.name, is_global,-1);
-    case idArrayType:
-        return get_value(root->idArr.name,is_global,root->idArr.position);
+        return get_value(root->id.name, is_global);
     case declarType:
         declare_variable(root->dec, is_global);
         return v;
@@ -478,7 +368,7 @@ valueType interpret(nodeType *root, int is_global)
             {
                 ante_last->next = NULL;
             }
-            return v;
+        return v;
         case FOR:
 
             if(root->opr.operands[0]->type != constType || root->opr.operands[1]->type != constType)
@@ -528,13 +418,8 @@ valueType interpret(nodeType *root, int is_global)
             print_value(interpret(root->opr.operands[0], is_global));
             return v;
         case ASSIGN:
-            if(root->opr.operands[0]->type == idType){
-                if(root->opr.operands[1]->type==idType)
-                    printf("hi : %s",root->opr.operands[1]->id.name);
-                assign_variable(root->opr.operands[0]->id.name,
-                                interpret(root->opr.operands[1], is_global), is_global,-1);
-            }else assign_variable(root->opr.operands[0]->idArr.name,
-                                interpret(root->opr.operands[1], is_global), is_global,root->opr.operands[0]->idArr.position);
+            assign_variable(root->opr.operands[0]->id,
+                            interpret(root->opr.operands[1], is_global), is_global);
         case ';':
             interpret(root->opr.operands[0], is_global);
             return interpret(root->opr.operands[1], is_global);
@@ -949,13 +834,12 @@ valueType interpret(nodeType *root, int is_global)
 
             vcompare.is_true = v.is_true || v2.is_true;
             return vcompare;
-        
-        case NOT:
-            v = interpret(root->opr.operands[0], is_global);
-
-            vcompare.is_true = 1 - v.is_true;
-            return vcompare;
         }
+    case NOT:
+        v = interpret(root->opr.operands[0], is_global);
+
+        vcompare.is_true = 1 - v.is_true;
+        return vcompare;
     }
 }
 

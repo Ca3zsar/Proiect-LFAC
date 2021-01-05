@@ -12,15 +12,24 @@ int yylex();
 
 nodeType *opr(int operation,int number, ...);
 nodeType *id(char *name);
-nodeType *idArray(char *name,int position);
 nodeType *constant(valueType value,char *type);
 nodeType *func(char *name,char *type,...);
-nodeType *dec(char *type,char **names,int constant);
+nodeType *dec(char *type,char **names,int constant,int array);
+nodeType *function(char *type,char *name);
+
+nodeType *dec_functions[100];
+nodeType *fct_to_run[100];
+int func_index=0;
+
+char *par_types[100];
+char *par[100];
+int par_index;
 
 char *temp_ids[100];
 int temp_arr[100];
 int temp_index;
 
+void assign_class(char *class_n);
 void freeNode(nodeType *p);
 %}
 
@@ -59,7 +68,7 @@ void freeNode(nodeType *p);
 %type <nodePointer> instruction
 %type <nodePointer> conditions
 %type <nodePointer> while_check if_check for_check
-%type <nodePointer> statements interior_statements
+%type <nodePointer> statements interior_statements function_instr
 %type <nodePointer> global function
 %type <nodePointer> declaration
 
@@ -75,7 +84,8 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global{interpret($2,1);freeNode($2);}
+program : program global {nodeType* temp = (nodeType*)malloc(sizeof(nodeType));temp = $2;
+                          interpret($2,1);freeNode($2);}
         | program function {compile($2,var_stack);interpret($2,0);freeNode($2);}
         | /* empty */
         ;
@@ -100,32 +110,33 @@ interior_statements : statements { $$ = $1;}
                     | interior_statements statements {$$ = opr(';',2,$1,$2);}
                     ;
 
-function : TYPE ID '(' parameter_list ')' '{' function_instr '}'
+function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
+                                           opr('f',2,dec_functions[func_index]=function($1,$2),$7);func_index++;}
          ;
 
-function_instr : function_instr statements
-               | statements
+function_instr : statements {$$ = $1;}
+               | function_instr statements {$$ = opr(';',2,$1,$2);}
                ;
 
-declaration : TYPE identifier {$$=dec($1,temp_ids,0);}
-           | CONST TYPE identifier {$$=dec($2,temp_ids,1);}
-           | CLASS ID '{' class_dec '}'
-           | ID ID 
+declaration : TYPE identifier {$$=dec($1,temp_ids,0,0);}
+           | CONST TYPE identifier {$$=dec($2,temp_ids,1,0);}
+           | CLASS ID '{' class_dec '}' {assign_class($2);}
+           | ID ID '('  ')'
            ;
 
-identifier :  identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=-1;temp_index++;}
-            | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);if($5.integer <=0)yyerror("size of array must be positive!");
-                                                temp_arr[temp_index]=$5.integer;temp_index++;}
-            | ID  {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=-1;temp_index++;}
-            | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);if($3.integer <=0)yyerror("size of array must be positive!");
-                                  temp_arr[temp_index]=$3.integer;temp_index++;}
+identifier : /* identifier ',' assignation */ 
+             identifier ',' ID {temp_ids[temp_index]= strdup($3);temp_arr[temp_index]=0;temp_index++;}
+            | identifier ',' ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($3);temp_arr[temp_index]=$5.integer;temp_index++;}
+            | /* assignation */
+            | ID  {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=0;temp_index++;}
+            | ID '[' INT_NUM ']' {temp_ids[temp_index] = strdup($1);temp_arr[temp_index]=$3.integer;temp_index++;}
             ;
 
 class_dec : declaration ';' class_dec
           | declaration ';'
           | ID '(' parameter_list ')' '{' class_instr'}'
-          | function class_dec
-          | function 
+          | function class_dec {dec_functions[func_index-1]->fct.in_class=1;}
+          | function {dec_functions[func_index-1]->fct.in_class=1;}
           ;
 
 class_instr : class_instr declaration ';'
@@ -134,21 +145,14 @@ class_instr : class_instr declaration ';'
             | class_instr PRINT ';'
             | /* empty */
 
-parameter_list : parameter
-                | parameter_list ',' parameter
+parameter_list : TYPE ID {par_types[par_index]=strdup($1);par[par_index]=strdup($2);par_index++;}
+                | parameter_list ',' TYPE ID {par_types[par_index]=strdup($3);par[par_index]=strdup($4);par_index++;}
+                | /* empty */
                 ;
-
-parameter : TYPE ID 
-	    | /* empty */
-	    ;
 
 assignation : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID ASSIGN CHAR {valueType v;v.string_value = strdup($3);v.value_type=strdup("char");$$ = opr(ASSIGN,2,id($1),constant(v,"char"));}
             | ID ASSIGN TEXT {valueType v;v.string_value = strdup($3);v.value_type=strdup("string");$$ = opr(ASSIGN,2,id($1),constant(v,"string"));}
-            | ID '[' INT_NUM ']' ASSIGN expr {$$ = opr(ASSIGN,2,idArray($1,$3.integer),$6);}
-            | ID '[' INT_NUM ']' ASSIGN CHAR {valueType v;v.string_value = strdup($6);v.value_type=strdup("char");$$ = opr(ASSIGN,2,idArray($1,$3.integer),constant(v,"char"));}
-            | ID '[' INT_NUM ']' ASSIGN TEXT {valueType v;v.string_value = strdup($6);v.value_type=strdup("string");$$ = opr(ASSIGN,2,idArray($1,$3.integer),constant(v,"string"));}
-            
             ;
 
 instruction :  function_call
@@ -163,6 +167,10 @@ function_call : ID '(' arguments ')'
              
 arguments : arguments ',' expr
           | arguments ',' function_call
+          | arguments ',' TEXT
+          | arguments ',' CHAR
+          | CHAR
+          | TEXT
           | expr
           | function_call
           | /* empty */
@@ -191,7 +199,6 @@ conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr
            ;
 
 expr : ID {$$=id($1);}
-     | ID '[' INT_NUM ']' {$$ = idArray($1,$3.integer);}
      | INT_NUM {valueType v;v.i_value=$1.integer;v.value_type=strdup("int");$$=constant(v,"int");}
      | FLOAT_NUM {valueType v;v.f_value=$1.rational;v.value_type=strdup("float");$$=constant(v,"float");}
      | BOOL_VAL {valueType v;
@@ -259,41 +266,26 @@ nodeType *id(char *name)
 
   p->type = idType;
   p->id.name = strdup(name);
-  printf("poate? %s\n",p->id.name);
 
   return p;
 }
 
-nodeType *idArray(char *name,int position)
-{
-  nodeType *p;
-  //alocate node
-  if ((p = malloc(sizeof(idArrayNode))) == NULL)
-    yyerror("cannot allocate node");
-
-  p->type = idArrayType;
-  p->idArr.name = strdup(name);
-  p->idArr.position = position;
-
-  return p;
-}
-
-nodeType *dec(char *type,char **name,int constant)
+nodeType *dec(char *type,char **name,int constant,int array)
 {
   nodeType *p;
 
   // allocate node
-  if ((p = (nodeType*)malloc(sizeof(declarNode) +sizeof(int)*temp_index)) == NULL)
+  if ((p = (nodeType*)malloc(sizeof(declarNode))) == NULL)
     yyerror("cannot allocate node");
 
   p->type = declarType;
   for(int i=0;i<temp_index;i++)
   {
-    p->dec.inf[i].name = strdup(temp_ids[i]);
-    p->dec.inf[i].arr_size = temp_arr[i];
+    p->dec.names[i] = strdup(temp_ids[i]);
   }
   p->dec.pred_type = strdup(type);
   p->dec.constant = constant;
+  p->dec.arr_size = array;
   p->dec.nr_declared = temp_index;
 
   temp_index=0;
@@ -327,6 +319,47 @@ nodeType *opr(int operation,int number, ...)
   return p;
 }
 
+nodeType *function(char *type,char *name)
+{
+  nodeType *p;
+  size_t size;
+
+  size = sizeof(functionNode);
+  if((p = malloc(sizeof(size))) == NULL)
+    yyerror("cannot allocate node");
+
+  p->type = funcType;
+  p->fct.name = strdup(name);
+  p->fct.par_number = par_index;
+  p->fct.return_type = strdup(type);
+  p->fct.class_name = NULL;
+  p->fct.in_class = 0;
+
+  for(int i = 0; i<par_index;i++)
+  {
+    p->fct.par_names[i]=strdup(par[i]);
+    p->fct.par_types[i]=strdup(par_types[i]);
+  }
+
+  par_index=0;
+
+  return p;
+}
+
+void assign_class(char *class_n)
+{
+  for(int i=0;i<func_index;i++)
+  {
+    if(dec_functions[i]->fct.in_class)
+    {
+      if(dec_functions[i]->fct.class_name == NULL)
+      {
+        dec_functions[i]->fct.class_name = strdup(class_n);
+      }
+    }
+  }
+}
+
 void freeNode(nodeType *p)
 {
   int i;
@@ -341,10 +374,38 @@ void freeNode(nodeType *p)
   free(p);
 }
 
+void create_table()
+{
+  FILE *symbol = fopen("symbol_table.txt","w");
+  // Print the functions.
+  for(int i=0;i<func_index;i++)
+    {
+      fprintf(symbol,"%s ",dec_functions[i]->fct.return_type);
+      fprintf(symbol,"%s ",dec_functions[i]->fct.name);
+      
+      fprintf(symbol,"( ");
+      for(int j=0;j<dec_functions[i]->fct.par_number;j++)
+      {
+        fprintf(symbol,"%s %s, ",dec_functions[i]->fct.par_types[j],dec_functions[i]->fct.par_names[j]);
+      }
+      fprintf(symbol," )");
+
+      if(dec_functions[i]->fct.in_class)
+      {
+        fprintf(symbol," :: class %s\n",dec_functions[i]->fct.class_name);
+      }else{
+        fprintf(symbol," :: global\n");
+      }
+      fprintf(symbol,"----------\n");
+    }
+}
+
 int main(void)
 {
     yyin = fopen("program.txt","r");
     yyparse();
-    printStack();
+    create_table();
+    // printStack();
+    
     return 0;
 }

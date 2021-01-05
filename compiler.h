@@ -9,7 +9,7 @@ static int lbl;
 int compile(nodeType *root,stackType *stack)
 {
     int lbl1,lbl2;
-    symbol = fopen("symbol_table.txt","w");
+    
 
     if(!root)return 0;
     switch(root->type)
