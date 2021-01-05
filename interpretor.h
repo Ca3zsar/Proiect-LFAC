@@ -14,19 +14,19 @@ extern void yyerror(const char *s);
 stackType *global_head = NULL;
 stackType *global_last = NULL;
 
-stackType *var_stack = NULL;
+stackType *var_stack[100];
 
 stackType *exists_variable(char *name, int is_global)
 {
 
     stackType *temp_stack = (stackType *)malloc(sizeof(stackType));
-    if (is_global)
+    if(is_global==-1)
     {
         temp_stack = global_head;
     }
     else
     {
-        temp_stack = var_stack;
+        temp_stack = var_stack[is_global];
     }
 
     while (temp_stack != NULL)
@@ -44,7 +44,7 @@ void declare_variable(declarNode node, int is_global)
 {
     int i = 0;
 
-    if (is_global)
+    if(is_global==-1)
     {
         if (global_head == NULL)
         {
@@ -63,30 +63,30 @@ void declare_variable(declarNode node, int is_global)
     }
     else
     {
-        if (var_stack == NULL)
+        if (var_stack[is_global] == NULL)
         {
-            var_stack = (stackType *)malloc(sizeof(stackType));
-            var_stack->next = NULL;
-            var_stack->var.value.value_type = strdup(node.pred_type);
-            var_stack->var.name = strdup(node.names[0]);
-            var_stack->tip = 1;
-            var_stack->var.initialised = 0;
+            var_stack[is_global] = (stackType *)malloc(sizeof(stackType));
+            var_stack[is_global]->next = NULL;
+            var_stack[is_global]->var.value.value_type = strdup(node.pred_type);
+            var_stack[is_global]->var.name = strdup(node.names[0]);
+            var_stack[is_global]->tip = 1;
+            var_stack[is_global]->var.initialised = 0;
             if (node.constant)
-                var_stack->var.constant = 1;
+                var_stack[is_global]->var.constant = 1;
             else
-                var_stack->var.constant = 0;
+                var_stack[is_global]->var.constant = 0;
             i++;
         }
     }
 
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
-    if (is_global)
+    if(is_global==-1)
     {
         current_stack = global_head;
     }
     else
     {
-        current_stack = var_stack;
+        current_stack = var_stack[is_global];
     }
 
     for (; i < node.nr_declared; i++)
@@ -126,13 +126,13 @@ void assign_variable(idNode node, valueType val, int is_global)
     stackType *found = (stackType *)malloc(sizeof(stackType));
 
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
-    if (is_global)
+    if(is_global==-1)
     {
         current_stack = global_head;
     }
     else
     {
-        current_stack = var_stack;
+        current_stack = var_stack[is_global];
     }
 
     if (!(found = exists_variable(var_name, is_global)))
@@ -169,13 +169,13 @@ valueType get_value(char *name, int is_global)
     stackType *found = (stackType *)malloc(sizeof(stackType));
 
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
-    if (is_global)
+    if(is_global==-1)
     {
         current_stack = global_head;
     }
     else
     {
-        current_stack = var_stack;
+        current_stack = var_stack[is_global];
     }
 
     if (!(found = exists_variable(name, is_global)))
@@ -211,7 +211,7 @@ stackType *add_to_stack(stackType *next_el, int is_global)
 {
     stackType *current_stack = (stackType *)malloc(sizeof(stackType));
 
-    if (is_global)
+    if(is_global==-1)
     {
         if (global_head == NULL)
         {
@@ -223,22 +223,22 @@ stackType *add_to_stack(stackType *next_el, int is_global)
     }
     else
     {
-        if (var_stack == NULL)
+        if (var_stack[is_global] == NULL)
         {
-            var_stack = (stackType *)malloc(sizeof(stackType));
-            var_stack->next = NULL;
-            var_stack->tip = 0;
+            var_stack[is_global] = (stackType *)malloc(sizeof(stackType));
+            var_stack[is_global]->next = NULL;
+            var_stack[is_global]->tip = 0;
             return 0;
         }
     }
 
-    if (is_global)
+    if(is_global==-1)
     {
         current_stack = global_head;
     }
     else
     {
-        current_stack = var_stack;
+        current_stack = var_stack[is_global];
     }
 
     stackType *temp = (stackType *)malloc(sizeof(stackType));
@@ -331,10 +331,10 @@ valueType interpret(nodeType *root, int is_global)
             interpret(root->opr.operands[1],is_global);
 
             if (ante_last == NULL){
-                if(is_global){
+                if(is_global==-1){
                     global_head = NULL;
                 }else{
-                    var_stack = NULL;
+                    var_stack[is_global] = NULL;
                 }
             }
             else
@@ -342,6 +342,13 @@ valueType interpret(nodeType *root, int is_global)
                 ante_last->next = NULL;
             }
             break;
+        case RETURN:
+            v = interpret(root->opr.operands[0],is_global);
+
+            if(strcmp(v.value_type,dec_functions[is_global]->fct.return_type))
+                yyerror("return type and function are not the same");
+            
+            return v;
         case WHILE:
             while (interpret(root->opr.operands[0], is_global).is_true)
             {
@@ -355,10 +362,10 @@ valueType interpret(nodeType *root, int is_global)
                 interpret(root->opr.operands[1], is_global);
 
                 if (ante_last == NULL){
-                    if(is_global){
+                    if(is_global==-1){
                         global_head = NULL;
                     }else{
-                        var_stack = NULL;
+                        var_stack[is_global] = NULL;
                     }
                 }
                 else
@@ -383,17 +390,17 @@ valueType interpret(nodeType *root, int is_global)
                 interpret(root->opr.operands[2], is_global);
             }
             if (ante_last == NULL){
-                if(is_global){
+                if(is_global==-1){
                     global_head = NULL;
                 }else{
-                    var_stack = NULL;
+                    var_stack[is_global] = NULL;
                 }
             }
             else
             {
                 ante_last->next = NULL;
             }
-        return v;
+            return v;
         case FOR:
 
             if(root->opr.operands[0]->type != constType || root->opr.operands[1]->type != constType)
@@ -417,10 +424,10 @@ valueType interpret(nodeType *root, int is_global)
                 interpret(root->opr.operands[2], is_global);
 
                 if (ante_last == NULL){
-                    if(is_global){
+                    if(is_global==-1){
                         global_head = NULL;
                     }else{
-                        var_stack = NULL;
+                        var_stack[is_global] = NULL;
                     }
                 }
                 else

@@ -20,6 +20,8 @@ nodeType *function(char *type,char *name,int inClass);
 int exists_function(char *return_type,char *name,int inClass);
 void assign_class(char *class_n);
 void freeNode(nodeType *p);
+
+int general_scope=-1;
 %}
 
 %union {
@@ -58,7 +60,7 @@ void freeNode(nodeType *p);
 %type <nodePointer> conditions
 %type <nodePointer> while_check if_check for_check
 %type <nodePointer> statements interior_statements function_instr class_instr
-%type <nodePointer> global function
+%type <nodePointer> global function_call
 %type <nodePointer> declaration
 
 %left OR 
@@ -73,8 +75,8 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;interpret($2,-1);}
-        | program function 
+program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;interpret($2,general_scope);general_scope=-1;}
+        | program dec_function 
         | /* empty */
         ;
 
@@ -98,7 +100,7 @@ interior_statements : statements { $$ = $1;}
                     | interior_statements statements {$$ = opr(';',2,$1,$2);}
                     ;
 
-function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
+dec_function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
                                            opr('f',2,dec_functions[func_index]=function($1,$2,0),$7);func_index++;}
          ;
 
@@ -153,7 +155,7 @@ assignement : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID '[' INT_NUM ']' ASSIGN TEXT
             ;
 
-instruction :  function_call
+instruction :  function_call 
              | EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
              | expr {$$ = $1;}
              | ID '.' ID
@@ -165,14 +167,43 @@ function_call : ID '(' arguments ')' {
                                       }
              ;
              
-arguments : arguments ',' expr
-          | arguments ',' function_call
-          | arguments ',' TEXT
-          | arguments ',' CHAR
-          | CHAR
-          | TEXT
-          | expr
-          | function_call
+arguments : arguments ',' expr {valueType v=interpret($3,general_scope);
+                                par_types[par_index] = strdup(v.value_type);
+                                temp_var[par_index].value = v; par_index++;
+                               }
+          | arguments ',' function_call{valueType v=interpret($3,general_scope);
+                                        par_types[par_index] = strdup(v.value_type);
+                                        temp_var[par_index].value = v; par_index++;
+                                       }
+          | arguments ',' TEXT {  valueType vtemp ; vtemp.string_value = strdup($3);
+                                valueType v=interpret(constant(vtemp,"char"),general_scope);
+                                par_types[par_index] = strdup(v.value_type);
+                                temp_var[par_index].value = v; par_index++;
+                              }
+          | arguments ',' CHAR {  valueType vtemp ; vtemp.string_value = strdup($3);
+                                  valueType v=interpret(constant(vtemp,"char"),general_scope);
+                                  par_types[par_index] = strdup(v.value_type);
+                                  temp_var[par_index].value = v; par_index++;
+                                }
+
+          | CHAR {  valueType vtemp ; vtemp.string_value = strdup($1);
+                    valueType v=interpret(constant(vtemp,"char"),general_scope);
+                    par_types[par_index] = strdup(v.value_type);
+                    temp_var[par_index].value = v; par_index++;
+                 }
+          | TEXT {  valueType vtemp ; vtemp.string_value = strdup($1);
+                    valueType v=interpret(constant(vtemp,"char"),general_scope);
+                    par_types[par_index] = strdup(v.value_type);
+                    temp_var[par_index].value = v; par_index++;
+                 }
+          | expr {valueType v=interpret($1,general_scope);
+                                par_types[par_index] = strdup(v.value_type);
+                                temp_var[par_index].value = v; par_index++;
+                               }
+          | function_call    {valueType v=interpret($1,general_scope);
+                                par_types[par_index] = strdup(v.value_type);
+                                temp_var[par_index].value = v; par_index++;
+                               }
           | /* empty */
           ;
 
@@ -347,6 +378,11 @@ nodeType *function(char *type,char *name,int inClass)
   par_index=0;
 
   return p;
+}
+
+int search_function(char *name,int inClass)
+{
+
 }
 
 int exists_function(char *return_type,char *name,int inClass)

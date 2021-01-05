@@ -93,4 +93,5 @@ char *temp_ids[100];
 int temp_arr[100];
 int temp_index;
 
+struct variables temp_var[100];
 #endif
