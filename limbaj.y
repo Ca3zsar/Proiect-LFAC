@@ -15,7 +15,7 @@ nodeType *id(char *name);
 nodeType *constant(valueType value,char *type);
 nodeType *func(char *name,char *type,...);
 nodeType *dec(char *type,char **names,int constant,int array);
-nodeType *function(char *type,char *name);
+nodeType *function(char *type,char *name,int inClass);
 
 nodeType *dec_functions[100];
 nodeType *fct_to_run[100];
@@ -29,6 +29,7 @@ char *temp_ids[100];
 int temp_arr[100];
 int temp_index;
 
+int exists_function(char *return_type,char *name,int inClass);
 void assign_class(char *class_n);
 void freeNode(nodeType *p);
 %}
@@ -84,8 +85,7 @@ void freeNode(nodeType *p);
 %nonassoc ELSE
 
 %%
-program : program global {nodeType* temp = (nodeType*)malloc(sizeof(nodeType));temp = $2;
-                          interpret($2,1);freeNode($2);}
+program : program global {interpret($2,1);}
         | program function {compile($2,var_stack);interpret($2,0);freeNode($2);}
         | /* empty */
         ;
@@ -111,7 +111,7 @@ interior_statements : statements { $$ = $1;}
                     ;
 
 function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
-                                           opr('f',2,dec_functions[func_index]=function($1,$2),$7);func_index++;}
+                                           opr('f',2,dec_functions[func_index]=function($1,$2,0),$7);func_index++;}
          ;
 
 function_instr : statements {$$ = $1;}
@@ -135,9 +135,13 @@ identifier : /* identifier ',' assignation */
 class_dec : declaration ';' class_dec
           | declaration ';'
           | ID '(' parameter_list ')' '{' class_instr'}'
-          | function class_dec {dec_functions[func_index-1]->fct.in_class=1;}
-          | function {dec_functions[func_index-1]->fct.in_class=1;}
+          | class_function class_dec 
+          | class_function 
           ;
+
+class_function : TYPE ID '(' parameter_list ')' '{' function_instr '}' {fct_to_run[func_index] = 
+                                           opr('f',2,dec_functions[func_index]=function($1,$2,1),$7);func_index++;}
+               ;
 
 class_instr : class_instr declaration ';'
             | class_instr instruction ';'
@@ -190,11 +194,11 @@ for_check : FOR '(' expr ':' expr ')' '{' interior_statements '}'
                                     {$$ = opr(FOR,3,$3,$5,$8);}
 
 
-conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);printf("expr->expr&&expr\n");}
-           | conditions OR conditions  {$$ = opr(OR,2,$1,$3);printf("expr->expr||expr\n");}
-           | '(' conditions AND conditions ')' {$$ = opr(AND,2,$2,$4);printf("expr->expr&&expr\n");}
-           | '(' conditions OR conditions ')'{$$ = opr(OR,2,$2,$4);printf("expr->expr||expr\n");}
-           | NOT conditions {$$ = opr(NOT,1,$2);printf("expr->!expr\n");}
+conditions : conditions AND conditions {$$ = opr(AND,2,$1,$3);}
+           | conditions OR conditions  {$$ = opr(OR,2,$1,$3);}
+           | '(' conditions AND conditions ')' {$$ = opr(AND,2,$2,$4);}
+           | '(' conditions OR conditions ')'{$$ = opr(OR,2,$2,$4);}
+           | NOT conditions {$$ = opr(NOT,1,$2);}
            | expr {$$ = $1;}
            ;
 
@@ -251,7 +255,7 @@ nodeType *constant(valueType value,char* type)
   }
   if(strcmp(type,"bool")==0)
   {
-    p->con.value.b_value = value.i_value;
+    p->con.value.b_value = value.b_value;
   }
 
   return p;
@@ -319,10 +323,13 @@ nodeType *opr(int operation,int number, ...)
   return p;
 }
 
-nodeType *function(char *type,char *name)
+nodeType *function(char *type,char *name,int inClass)
 {
   nodeType *p;
   size_t size;
+
+  if(exists_function(type,name,inClass))
+    yyerror("cannot declare function with identical signature in the same scope");
 
   size = sizeof(functionNode);
   if((p = malloc(sizeof(size))) == NULL)
@@ -333,7 +340,7 @@ nodeType *function(char *type,char *name)
   p->fct.par_number = par_index;
   p->fct.return_type = strdup(type);
   p->fct.class_name = NULL;
-  p->fct.in_class = 0;
+  p->fct.in_class = inClass;
 
   for(int i = 0; i<par_index;i++)
   {
@@ -344,6 +351,63 @@ nodeType *function(char *type,char *name)
   par_index=0;
 
   return p;
+}
+
+int exists_function(char *return_type,char *name,int inClass)
+{
+  for(int i=0;i<func_index;i++)
+  {
+    if(dec_functions[i]->fct.in_class == inClass)
+    {
+      if(inClass != 0)
+      {
+        if(dec_functions[i]->fct.class_name == NULL)
+        {
+          if(strcmp(name,dec_functions[i]->fct.name)==0){
+            if(strcmp(return_type,dec_functions[i]->fct.return_type))
+              yyerror("cannot declare 2 functions with same name and different return types");
+
+            if(par_index == dec_functions[i]->fct.par_number)
+            {
+              int ok=0;
+              for(int j=0;j<par_index;j++)
+              {
+                
+                if(strcmp(par_types[j],dec_functions[i]->fct.par_types[j]))
+                  ok = 1;
+                
+                if(ok)break;
+              }
+              if(!ok)
+                return 1;
+            }
+          }
+
+        }
+      }else{
+        if(strcmp(name,dec_functions[i]->fct.name)==0){
+            if(strcmp(return_type,dec_functions[i]->fct.return_type))
+              yyerror("cannot declare 2 functions with same name and different return types");
+
+            if(par_index == dec_functions[i]->fct.par_number)
+            {
+              int ok=0;
+              for(int j=0;j<par_index;j++)
+              {
+                
+                if(strcmp(par_types[j],dec_functions[i]->fct.par_types[j]))
+                  ok = 1;
+                
+                if(ok)break;
+              }
+              if(!ok)
+                return 1;
+            }
+          }
+      }
+    }
+  }
+  return 0;
 }
 
 void assign_class(char *class_n)

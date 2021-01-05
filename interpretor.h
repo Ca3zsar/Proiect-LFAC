@@ -53,6 +53,7 @@ void declare_variable(declarNode node, int is_global)
             global_head->var.value.value_type = strdup(node.pred_type);
             global_head->var.name = strdup(node.names[0]);
             global_head->tip = 1;
+            global_head->var.initialised = 0;
             if (node.constant)
                 global_head->var.constant = 1;
             else
@@ -68,7 +69,8 @@ void declare_variable(declarNode node, int is_global)
             var_stack->next = NULL;
             var_stack->var.value.value_type = strdup(node.pred_type);
             var_stack->var.name = strdup(node.names[0]);
-            global_head->tip = 1;
+            var_stack->tip = 1;
+            var_stack->var.initialised = 0;
             if (node.constant)
                 var_stack->var.constant = 1;
             else
@@ -104,6 +106,7 @@ void declare_variable(declarNode node, int is_global)
 
         last_stack->next = NULL;
         last_stack->tip = 1;
+        last_stack->var.initialised = 0;
 
         stackType *temp;
         temp = current_stack;
@@ -119,7 +122,6 @@ void declare_variable(declarNode node, int is_global)
 
 void assign_variable(idNode node, valueType val, int is_global)
 {
-
     char *var_name = strdup(node.name);
     stackType *found = (stackType *)malloc(sizeof(stackType));
 
@@ -158,6 +160,7 @@ void assign_variable(idNode node, valueType val, int is_global)
     {
         found->var.value.string_value = strdup(val.string_value);
     }
+    found->var.initialised = 1;
 }
 
 valueType get_value(char *name, int is_global)
@@ -177,6 +180,9 @@ valueType get_value(char *name, int is_global)
 
     if (!(found = exists_variable(name, is_global)))
         yyerror("variable not declared");
+
+    if(found->var.initialised==0)
+        yyerror("variable not initialised");
 
     valueType tempVal;
 
@@ -267,7 +273,7 @@ void print_value(valueType val)
         if (val.b_value == 0)
             printf("False\n");
         else
-            printf("True");
+            printf("True\n");
     }
 }
 
@@ -834,12 +840,12 @@ valueType interpret(nodeType *root, int is_global)
 
             vcompare.is_true = v.is_true || v2.is_true;
             return vcompare;
-        }
-    case NOT:
-        v = interpret(root->opr.operands[0], is_global);
+        case NOT:
+            v = interpret(root->opr.operands[0], is_global);
 
-        vcompare.is_true = 1 - v.is_true;
-        return vcompare;
+            vcompare.is_true = 1 - v.is_true;
+            return vcompare;
+        }
     }
 }
 
