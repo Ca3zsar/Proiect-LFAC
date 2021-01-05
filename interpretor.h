@@ -298,6 +298,8 @@ void printStack()
     }
 }
 
+valueType v_global ;
+
 valueType interpret(nodeType *root, int is_global)
 {
     valueType v, v2, vcompare;
@@ -341,14 +343,14 @@ valueType interpret(nodeType *root, int is_global)
             {
                 ante_last->next = NULL;
             }
-            break;
+            return v_global;
         case RETURN:
-            v = interpret(root->opr.operands[0],is_global);
+            v_global = interpret(root->opr.operands[0],is_global);
 
-            if(strcmp(v.value_type,dec_functions[is_global]->fct.return_type))
+            if(strcmp(v_global.value_type,dec_functions[is_global]->fct.return_type))
                 yyerror("return type and function are not the same");
-            
-            return v;
+
+            return v_global;
         case WHILE:
             while (interpret(root->opr.operands[0], is_global).is_true)
             {

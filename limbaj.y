@@ -157,8 +157,7 @@ assignement : ID ASSIGN expr {$$ = opr(ASSIGN,2,id($1),$3);}
             | ID '[' INT_NUM ']' ASSIGN TEXT
             ;
 
-instruction :  function_call {$$=$1;}
-             | EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
+instruction :  EVAL '(' expr ')' {$$=opr(EVAL,1,$3);}
              | expr {$$ = $1;}
              | ID '.' ID
              | ID '.' ID '(' arguments ')'
@@ -175,10 +174,6 @@ arguments : arguments ',' expr {valueType v=interpret($3,general_scope);
                                 par_types[par_index] = strdup(v.value_type);
                                 temp_var[par_index].value = v; par_index++;
                                }
-          | arguments ',' function_call{valueType v=interpret($3,general_scope);
-                                        par_types[par_index] = strdup(v.value_type);
-                                        temp_var[par_index].value = v; par_index++;
-                                       }
           | arguments ',' TEXT {  valueType vtemp ; vtemp.string_value = strdup($3); vtemp.value_type=strdup("string");
                                 valueType v=interpret(constant(vtemp,"string"),general_scope);
                                 par_types[par_index] = strdup(v.value_type);
@@ -201,10 +196,6 @@ arguments : arguments ',' expr {valueType v=interpret($3,general_scope);
                     temp_var[par_index].value = v; par_index++;
                  }
           | expr {valueType v=interpret($1,general_scope);
-                                par_types[par_index] = strdup(v.value_type);
-                                temp_var[par_index].value = v; par_index++;
-                               }
-          | function_call    {valueType v=interpret($1,general_scope);
                                 par_types[par_index] = strdup(v.value_type);
                                 temp_var[par_index].value = v; par_index++;
                                }
@@ -243,6 +234,7 @@ expr : ID {$$=id($1);}
                 v.value_type=strdup("bool");
                 $$=constant(v,"bool");
                 }
+     | function_call {$$ = $1;}
      | ID '[' INT_NUM ']'
      | expr '+' expr {$$=opr('+',2,$1,$3);}
      | expr '-' expr {$$=opr('-',2,$1,$3);}
