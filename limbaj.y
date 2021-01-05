@@ -13,7 +13,6 @@ int yylex();
 nodeType *opr(int operation,int number, ...);
 nodeType *id(char *name);
 nodeType *constant(valueType value,char *type);
-nodeType *func(char *name,char *type,...);
 nodeType *dec(char *type,char **names,int constant,int array);
 nodeType *function(char *type,char *name,int inClass);
 
