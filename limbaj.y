@@ -77,7 +77,7 @@ int general_scope=-1;
 %nonassoc ELSE
 
 %%
-program : program global {nodeType* temp = malloc(sizeof(nodeType));temp=$2;interpret($2,general_scope);general_scope=-1;}
+program : program global {interpret($2,general_scope);general_scope=-1;}
         | program dec_function 
         | /* empty */
         ;
@@ -332,7 +332,7 @@ nodeType *opr(int operation,int number, ...)
   int i;
 
   size = sizeof(operationNode) + (number ) * sizeof(nodeType*);
-  if ((p = malloc(sizeof(constNode))) == NULL)
+  if ((p = malloc(sizeof(operationNode) + (number-1)*sizeof(nodeType))) == NULL)
     yyerror("cannot allocate node");
 
   // copy info
@@ -545,8 +545,8 @@ void assign_variables(char *class_n)
 void freeNode(nodeType *p)
 {
   int i;
-  if(!p)return;
-  if(p->type == operType)
+  if(!p || (p->type == operType && p->opr.operation == 'f'))return;
+  if(p->type == operType && p->opr.operation != 'f')
   {
     for(i=0;i<p->opr.operNumber;i++)
     {
@@ -688,9 +688,7 @@ int main(void)
     yyin = fopen("program.txt","r");
     symbol = fopen("symbol_table.txt","w");
     yyparse();
-    // interpret(fct_to_run[0],0);
     create_table();
-    // printStack();
     
     return 0;
 }

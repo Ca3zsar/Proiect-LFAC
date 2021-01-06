@@ -5,7 +5,7 @@
 #include "y.tab.h"
 %}
 
-type "int"|"float"|"char"|"string"|"bool"
+type "int"|"float"|"char"|"string"|"bool"|"void"
 
 digit_n [1-9]
 digit [0-9]
